@@ -136,10 +136,18 @@ Resources:
       KeyName: !Ref FactoryKeyPair
 
 Outputs:
-  Instance1Id:
+  MasterId:
     Description: Master ID
     Value: !Ref FactoryMaster
 
-  Instance2Id:
+  NodeId:
     Description: Node ID
     Value: !Ref FactoryNode
+
+  FactorySecurityGroupId:
+    Description: Security Group ID of the created Factory Security Group
+    Value: !Ref FactorySecurityGroup
+
+  FactoryKeyPairNameOutput:
+    Description: Name of the EC2 Factory Key Pair used for the master and nodes
+    Value: !Ref FactoryKeyPair
