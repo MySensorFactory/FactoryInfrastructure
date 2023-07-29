@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation Template to create master and node for Kubernetes cluster
+
+Parameters:
+  MasterImageIdParam:
+    Description: ID of the AMI to use for EC2 instances
+    Type: String
+
+  MasterPrivateAddressParam:
+    Description: Master private ip
+    Type: String
+    Default: 172.31.15.100
+
+  NodeImageIdParam:
+    Description: ID of the AMI to use for EC2 instances
+    Type: String
+
+  FactorySecurityGroupNameParam:
+    Description: Name of the factory security group
+    Type: String
+    Default: FactorySecurityGroup
+
+  MasterInstanceTypeParam:
+    Description: Master instance type
+    Type: String
+    Default: t3.medium
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t3.medium
+      - t3.micro
+
+  NodeInstanceTypeParam:
+    Description: Node instance type
+    Type: String
+    Default: t3.medium
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t3.medium
+      - t3.micro
+
+Resources:
+  FactoryKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: "FactoryKeyPair"
+
+  FactorySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref FactorySecurityGroupNameParam
+      GroupDescription: Factory Security Group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 10251
+          ToPort: 10251
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 2379
+          ToPort: 2379
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5555
+          ToPort: 5555
+          SourceSecurityGroupName: !Ref FactorySecurityGroupNameParam
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 10250
+          ToPort: 10250
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 6443
+          ToPort: 6443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 10252
+          ToPort: 10252
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: icmp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 30000
+          ToPort: 32767
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: icmp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+
+  FactoryMaster:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref MasterImageIdParam
+      InstanceType: !Ref MasterInstanceTypeParam
+      SecurityGroups:
+        - !Ref FactorySecurityGroup
+      KeyName: !Ref FactoryKeyPair
+      PrivateIpAddress: !Ref MasterPrivateAddressParam
+
+  FactoryNode:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref NodeImageIdParam
+      InstanceType: !Ref NodeInstanceTypeParam
+      SecurityGroups:
+        - !Ref FactorySecurityGroup
+      KeyName: !Ref FactoryKeyPair
+
+Outputs:
+  Instance1Id:
+    Description: Master ID
+    Value: !Ref FactoryMaster
+
+  Instance2Id:
+    Description: Node ID
+    Value: !Ref FactoryNode
