@@ -5,20 +5,62 @@ Parameters:
   MasterImageIdParam:
     Description: ID of the AMI to use for EC2 instances
     Type: String
+    Default: ami-034c3fe427642f7f9
+
+  NodeImageIdParam:
+    Description: ID of the AMI to use for EC2 instances
+    Type: String
+    Default: ami-0dbb32291d7a89b1f
 
   MasterPrivateAddressParam:
     Description: Master private ip
     Type: String
     Default: 172.31.15.100
 
-  NodeImageIdParam:
-    Description: ID of the AMI to use for EC2 instances
+  NodePrivateAddressParam:
+    Description: Master private ip
     Type: String
+    Default: 172.31.5.64
+
+  FactoryVpcCidrParam:
+    Description: Factory cidr param
+    Type: String
+    Default: 172.31.0.0/16
+
+  FactoryPublicSubnetAvailabilityZoneParam:
+    Description: Factory public subnet availability zone
+    Type: String
+    Default: eu-central-1b
+
+  FactoryPublicSubnetCidrParam:
+    Description: Factory public subnet cidr param
+    Type: String
+    Default: 172.31.0.0/20
+
+  FactoryPublicRouteCidrParam:
+    Description: Factory public route cidr param
+    Type: String
+    Default: "0.0.0.0/0"
+
+  FactoryKeyPairNameParam:
+    Description: Factory EC2 Kubernetes cluster keypair name
+    Type: String
+    Default: FactoryKeyPair
 
   FactorySecurityGroupNameParam:
     Description: Name of the factory security group
     Type: String
-    Default: FactorySecurityGroup
+    Default: FactoryGlobalSecurityGroup
+
+  FactoryMasterVolumeId:
+    Description: Id of the factory master node
+    Type: String
+    Default: vol-0d8aa9281cb26ce79
+
+  FactoryNodeVolumeId:
+    Description: Id of the factory node
+    Type: String
+    Default: vol-066b6740f06e34f7f
 
   MasterInstanceTypeParam:
     Description: Master instance type
@@ -43,14 +85,68 @@ Parameters:
       - t3.micro
 
 Resources:
+  FactoryVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref FactoryVpcCidrParam
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: FactoryVPC
+
+  FactoryInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  FactoryAttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref FactoryVPC
+      InternetGatewayId: !Ref FactoryInternetGateway
+
+  FactoryPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref FactoryVPC
+      CidrBlock: !Ref FactoryPublicSubnetCidrParam
+      AvailabilityZone: !Ref FactoryPublicSubnetAvailabilityZoneParam
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: PublicSubnet
+
+  FactoryPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref FactoryVPC
+      Tags:
+        - Key: Name
+          Value: FactoryPublicRouteTable
+
+  FactoryPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: FactoryAttachGateway
+    Properties:
+      RouteTableId: !Ref FactoryPublicRouteTable
+      DestinationCidrBlock: !Ref FactoryPublicRouteCidrParam
+      GatewayId: !Ref FactoryInternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref FactoryPublicSubnet
+      RouteTableId: !Ref FactoryPublicRouteTable
+  
   FactoryKeyPair:
     Type: AWS::EC2::KeyPair
     Properties:
-      KeyName: "FactoryKeyPair"
+      KeyName: !Ref FactoryKeyPairNameParam
 
-  FactorySecurityGroup:
+  FactoryGlobalSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      VpcId: !Ref FactoryVPC
       GroupName: !Ref FactorySecurityGroupNameParam
       GroupDescription: Factory Security Group
       SecurityGroupIngress:
@@ -66,10 +162,10 @@ Resources:
           FromPort: 2379
           ToPort: 2379
           CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 5555
-          ToPort: 5555
-          SourceSecurityGroupName: !Ref FactorySecurityGroupNameParam
+        #        - IpProtocol: tcp
+        #          FromPort: 5555
+        #          ToPort: 5555
+        #          SourceSecurityGroupName: !Ref FactorySecurityGroupNameParam
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
@@ -100,7 +196,7 @@ Resources:
           CidrIp: 0.0.0.0/0
         - IpProtocol: icmp
           FromPort: 0
-          ToPort: 65535
+          ToPort: -1
           CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
           FromPort: 30000
@@ -113,27 +209,130 @@ Resources:
           CidrIp: 0.0.0.0/0
         - IpProtocol: icmp
           FromPort: 0
-          ToPort: 65535
+          ToPort: -1
           CidrIp: 0.0.0.0/0
 
   FactoryMaster:
     Type: AWS::EC2::Instance
+    DependsOn: FactoryGlobalSecurityGroup
     Properties:
       ImageId: !Ref MasterImageIdParam
       InstanceType: !Ref MasterInstanceTypeParam
-      SecurityGroups:
-        - !Ref FactorySecurityGroup
+      SecurityGroupIds:
+        - !Ref FactoryGlobalSecurityGroup
       KeyName: !Ref FactoryKeyPair
       PrivateIpAddress: !Ref MasterPrivateAddressParam
+      SubnetId: !Ref FactoryPublicSubnet
 
   FactoryNode:
     Type: AWS::EC2::Instance
+    DependsOn: FactoryGlobalSecurityGroup
     Properties:
       ImageId: !Ref NodeImageIdParam
       InstanceType: !Ref NodeInstanceTypeParam
-      SecurityGroups:
-        - !Ref FactorySecurityGroup
+      SecurityGroupIds:
+        - !Ref FactoryGlobalSecurityGroup
       KeyName: !Ref FactoryKeyPair
+      PrivateIpAddress: !Ref NodePrivateAddressParam
+      SubnetId: !Ref FactoryPublicSubnet
+
+  FactoryCodeBuildPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: VisualEditor0
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketAcl
+              - s3:PutObject
+              - s3:GetObject
+              - s3:GetBucketLocation
+              - s3:GetObjectVersion
+              - logs:CreateLogGroup
+              - logs:PutLogEvents
+              - logs:CreateLogStream
+              - codebuild:CreateReportGroup
+              - codebuild:CreateReport
+              - codebuild:UpdateReport
+              - codebuild:BatchPutCodeCoverages
+              - codebuild:BatchPutTestCases
+              - codeartifact:GetAuthorizationToken
+              - codeartifact:ReadFromRepository
+              - codeartifact:GetRepositoryEndpoint
+              - codeartifact:PutPackageMetadata
+              - codeartifact:PublishPackageVersion
+            Resource:
+              - arn:aws:codeartifact:eu-central-1:781648067507:repository/factory/FactoryRepository
+              - arn:aws:codeartifact:eu-central-1:781648067507:package/factory/FactoryRepository/*/*/*
+              - arn:aws:codeartifact:eu-central-1:781648067507:domain/factory
+              - arn:aws:s3:::factory-ci-cd-*
+              - arn:aws:s3:::codepipeline-eu-central-1-*
+              - arn:aws:logs:eu-central-1:781648067507:log-group:/aws/codebuild/*
+              - arn:aws:codebuild:eu-central-1:781648067507:report-group/*
+          - Sid: VisualEditor1
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:CreateBucket
+              - s3:List*
+              - sts:GetServiceBearerToken
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeDhcpOptions
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:DescribeSubnets
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeVpcs
+            Resource: '*'
+          - Sid: VisualEditor2
+            Effect: Allow
+            Action:
+              - ssm:GetParameters
+              - ssm:GetParameter
+            Resource:
+              - arn:aws:ssm:*:781648067507:parameter/FactorySecrets/DOCKER_PASSWORD
+              - arn:aws:ssm:*:781648067507:parameter/FactorySecrets/DOCKER_USERNAME
+
+  FactoryCodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref FactoryCodeBuildPolicy
+
+  Demo1FactoryCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: Demo1FactoryBuildProject
+      ServiceRole: !GetAtt FactoryCodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/test.git
+        GitCloneDepth: 1
 
 Outputs:
   MasterId:
@@ -146,8 +345,20 @@ Outputs:
 
   FactorySecurityGroupId:
     Description: Security Group ID of the created Factory Security Group
-    Value: !Ref FactorySecurityGroup
+    Value: !Ref FactoryGlobalSecurityGroup
 
   FactoryKeyPairNameOutput:
     Description: Name of the EC2 Factory Key Pair used for the master and nodes
     Value: !Ref FactoryKeyPair
+
+  FactoryVpcId:
+    Description: Factory VPC ID
+    Value: !Ref FactoryVPC
+
+  FactoryCodeBuildRoleId:
+    Description: Factory Code Build ID
+    Value: !Ref FactoryCodeBuildRole
+
+  FactoryCodeBuildPolicyId:
+    Description: Factory Code Build ID
+    Value: !Ref FactoryCodeBuildPolicy
