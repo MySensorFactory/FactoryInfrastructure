@@ -38,6 +38,40 @@ Resources:
       TopicArn: !Ref FactoryDataSNSTopic
     Description: Subscription for TemperatureSQSQueue to FactoryDataSNSTopic
 
+  PressureSQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref PressureSQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt PressureSQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref FactoryDataSNSTopic
+
+  TemperatureSQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref TemperatureSQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt TemperatureSQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref FactoryDataSNSTopic
+
 Outputs:
   FactoryDataSNSTopic:
     Description: ARN of the created SNS Topic
