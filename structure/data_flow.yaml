@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation Template to create SNS topic and SQS queues
+
+Resources:
+  FactoryDataSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: FactoryDataTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+    Description: SNS topic for factory data
+
+  PressureSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: PressureSQSQueue
+    Description: SQS queue for pressure data
+
+  TemperatureSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: TemperatureSQSQueue
+    Description: SQS queue for temperature data
+
+  PressureFactoryDataSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt PressureSQSQueue.Arn
+      Protocol: sqs
+      TopicArn: !Ref FactoryDataSNSTopic
+    Description: Subscription for PressureSQSQueue to FactoryDataSNSTopic
+
+  TemperatureFactoryDataSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt TemperatureSQSQueue.Arn
+      Protocol: sqs
+      TopicArn: !Ref FactoryDataSNSTopic
+    Description: Subscription for TemperatureSQSQueue to FactoryDataSNSTopic
+
+Outputs:
+  FactoryDataSNSTopic:
+    Description: ARN of the created SNS Topic
+    Value: !Ref FactoryDataSNSTopic
+
+  PressureSQSQueueURL:
+    Description: URL of the pressure SQS Queue
+    Value: !Ref PressureSQSQueue
+
+  TemperatureSQSQueueURL:
+    Description: URL of the temperature SQS Queue
+    Value: !Ref TemperatureSQSQueue
