@@ -1,6 +1,24 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: CloudFormation Template to create SNS topic and SQS queues
 
+Parameters:
+  S3BucketParam:
+    Type: String
+    Default: factory-ci-cd
+    Description: Factory bucket name
+  S3KeyParam:
+    Type: String
+    Default: applications/lambda/factory_data_simulator.zip
+    Description: Factory key param
+  RegionParam:
+    Description: Region of the AWS resources
+    Type: String
+    Default: eu-central-1
+  AccountIdParam:
+    Description: AWS Account ID
+    Type: String
+    Default: 781648067507
+
 Resources:
   FactoryDataSNSTopic:
     Type: AWS::SNS::Topic
@@ -71,6 +89,48 @@ Resources:
             Condition:
               ArnEquals:
                 aws:SourceArn: !Ref FactoryDataSNSTopic
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: logs:CreateLogGroup
+                Resource: !Sub arn:aws:logs:${RegionParam}:${AccountIdParam}:*
+              - Effect: Allow
+                Action: logs:CreateLogStream
+                Resource: !Sub arn:aws:logs:${RegionParam}:${AccountIdParam}:log-group:/aws/lambda/*
+              - Effect: Allow
+                Action: logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${RegionParam}:${AccountIdParam}:log-group:/aws/lambda/*
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref FactoryDataSNSTopic
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: FactoryDataSimulator
+      Code:
+        S3Bucket: !Ref S3BucketParam
+        S3Key: !Ref S3KeyParam
+      Handler: factory_sns_topic_data_simulator.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TOPIC_ARN: !Ref FactoryDataSNSTopic
 
 Outputs:
   FactoryDataSNSTopic:

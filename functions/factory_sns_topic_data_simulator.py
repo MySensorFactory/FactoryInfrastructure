@@ -1,10 +1,11 @@
 import json
+import os
 import uuid
 
 import boto3
 
 sns_client = boto3.client('sns')
-TOPIC_ARN = 'arn:aws:sns:us-east-1:781648067507:df-FactoryDataSNSTopic-WgcDxuqsmpna.fifo'
+TOPIC_ARN = os.getenv('TOPIC_ARN')
 
 
 class Message:
