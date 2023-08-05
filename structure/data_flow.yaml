@@ -191,6 +191,38 @@ Resources:
         Key: !Ref S3FactoryDataSimulatorIteratorStateMachineKeyParam
       RoleArn: !GetAtt StepFunctionRole.Arn
 
+  StepFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: FactoryDataSimulatorStepFunctionExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !GetAtt FactoryDataSimulatorStepFunction.Arn
+
+  ScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: StepFunctionScheduleRule
+      Description: CloudWatch Events Rule to trigger Factory Data Simulator Step Function every minute
+      ScheduleExpression: "rate(1 minute)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt FactoryDataSimulatorStepFunction.Arn
+          Id: FactoryDataSimulatorStepFunction
+          RoleArn: !GetAtt StepFunctionExecutionRole.Arn
+          Input: "{ \"input\": {} }"
+
 Outputs:
   FactoryDataSNSTopic:
     Description: ARN of the created SNS Topic
