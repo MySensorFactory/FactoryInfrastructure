@@ -51,6 +51,10 @@ Resources:
   PressureFactoryDataSNSTopicSubscription:
     Type: AWS::SNS::Subscription
     Properties:
+      FilterPolicyScope: MessageBody
+      FilterPolicy:
+        sensor:
+          - Pressure
       Endpoint: !GetAtt PressureSQSQueue.Arn
       Protocol: sqs
       TopicArn: !Ref FactoryDataSNSTopic
@@ -59,6 +63,10 @@ Resources:
   TemperatureFactoryDataSNSTopicSubscription:
     Type: AWS::SNS::Subscription
     Properties:
+      FilterPolicyScope: MessageBody
+      FilterPolicy:
+        sensor:
+          - Temperature
       Endpoint: !GetAtt TemperatureSQSQueue.Arn
       Protocol: sqs
       TopicArn: !Ref FactoryDataSNSTopic
