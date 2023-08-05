@@ -6,9 +6,17 @@ Parameters:
     Type: String
     Default: factory-ci-cd
     Description: Factory bucket name
-  S3KeyParam:
+  S3FactoryDataSimulatorKeyParam:
     Type: String
     Default: applications/lambda/factory_data_simulator.zip
+    Description: Factory key param
+  S3FactoryDataSimulatorIteratorKeyParam:
+    Type: String
+    Default: applications/lambda/iterator.zip
+    Description: Factory key param
+  S3FactoryDataSimulatorIteratorStateMachineKeyParam:
+    Type: String
+    Default: applications/step_functions/iterator_state_machine.json
     Description: Factory key param
   RegionParam:
     Description: Region of the AWS resources
@@ -100,8 +108,12 @@ Resources:
             Principal:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
       Policies:
-        - PolicyName: LambdaPolicy
+        - PolicyName: FactoryBasicLambdaPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -124,13 +136,60 @@ Resources:
       FunctionName: FactoryDataSimulator
       Code:
         S3Bucket: !Ref S3BucketParam
-        S3Key: !Ref S3KeyParam
+        S3Key: !Ref S3FactoryDataSimulatorKeyParam
       Handler: factory_sns_topic_data_simulator.lambda_handler
       Runtime: python3.8
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
           TOPIC_ARN: !Ref FactoryDataSNSTopic
+
+  LambdaFunctionIterator:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: FactoryDataSimulatorIterator
+      Code:
+        S3Bucket: !Ref S3BucketParam
+        S3Key: !Ref S3FactoryDataSimulatorIteratorKeyParam
+      Handler: iterator.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          LAMBDA_TO_INVOKE: !Ref LambdaFunction
+
+  StepFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: StepFunctionBasicPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub ${LambdaFunctionIterator.Arn}
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub ${LambdaFunctionIterator.Arn}:*
+
+  FactoryDataSimulatorStepFunction:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionSubstitutions:
+        IteratorLambdaFunction: !GetAtt LambdaFunctionIterator.Arn
+      DefinitionS3Location:
+        Bucket: !Ref S3BucketParam
+        Key: !Ref S3FactoryDataSimulatorIteratorStateMachineKeyParam
+      RoleArn: !GetAtt StepFunctionRole.Arn
 
 Outputs:
   FactoryDataSNSTopic:

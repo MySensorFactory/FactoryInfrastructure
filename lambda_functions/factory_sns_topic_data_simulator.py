@@ -1,6 +1,8 @@
 import json
 import os
+import random
 import uuid
+from datetime import datetime
 
 import boto3
 
@@ -29,11 +31,21 @@ class Message:
         return cls(data['sensor'], data['value'], data['timestamp'], data['attributes'])
 
 
-def parse_data(event):
-    data = event['Records'][0]['body']
+def parse_data(records):
+    data = records[0]['body']
     sensor = data['sensor']
     value = data['value']
     timestamp = data['timestamp']
+    return sensor, timestamp, value
+
+
+SENSOR_TYPES = ['Pressure', 'Temperature']
+
+
+def generate_data():
+    sensor = random.choice(SENSOR_TYPES)
+    value = random.uniform(20.0, 30.0)
+    timestamp = datetime.utcnow().isoformat()
     return sensor, timestamp, value
 
 
@@ -63,17 +75,27 @@ def create_message(sensor: str, timestamp: str, value: any):
     return message
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context):
     """Example json data
 
-    >>> input_data = {
+ >>> input_data = {{
+  >>> "Records": [
+ >>>   {
+  >>>    "body": {
     >>>    "sensor": "Temperature",
-    >>>    "value": 25.5,
-    >>>    "timestamp": "2023-07-19T12:34:56Z"
-    >>> }
+     >>>   "value": 30.1,
+      >>>  "timestamp": "2023-07-19T12:34:56Z"
+    >>>  }
+  >>>  }
+  >>>]
+>>> }
     """
+
     try:
-        sensor, timestamp, value = parse_data(event)
+        if 'Records' in event:
+            sensor, timestamp, value = parse_data(event['Records'])
+        else:
+            sensor, timestamp, value = generate_data()
     except (KeyError, json.JSONDecodeError) as e:
         return create_response("Invalid input format: " + str(e), 400)
 
