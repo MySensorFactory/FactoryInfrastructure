@@ -5,11 +5,11 @@ import boto3
 
 s3 = boto3.client('s3')
 
-SOURCE_DIR = 'lambda_functions'
+SOURCE_DIR = os.environ.get('LAMBDAS_SOURCE_FOLDER')
 
-BUCKET_NAME = 'factory-ci-cd'
+BUCKET_NAME = os.environ.get('BUCKET_NAME')
 
-TARGET_DIR = 'applications/lambda'
+TARGET_DIR = os.environ.get('S3_LAMBDAS_DESTINATION')
 
 
 def is_python_script(s3_file: str) -> bool:
