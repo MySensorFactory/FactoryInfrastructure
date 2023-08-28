@@ -173,7 +173,7 @@ Resources:
             Resource: !GetAtt PressureSQSQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn: "FlowRateSNSTopic"
+                aws:SourceArn: !Ref PressureSNSTopic
 
   TemperatureSQSQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -190,7 +190,58 @@ Resources:
             Resource: !GetAtt TemperatureSQSQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn: "FlowRateSNSTopic"
+                aws:SourceArn: !Ref TemperatureSNSTopic
+
+  FlowRateSQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref FlowRateSQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt FlowRateSQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref FlowRateSNSTopic
+
+  GasCompositionSQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref GasCompositionSQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt GasCompositionSQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref GasCompositionSNSTopic
+
+  NoiseAndVibrationSQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref NoiseVibrationSQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt NoiseVibrationSQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref NoiseVibrationSNSTopic
 
   LambdaRole:
     Type: AWS::IAM::Role
