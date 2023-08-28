@@ -1,19 +1,44 @@
-import boto3
+import json
 import os
 
-client = boto3.client('lambda')
+import boto3
 
-LAMBDA_TO_INVOKE = os.getenv('LAMBDA_TO_INVOKE')
+lambda_client = boto3.client('lambda')
+
+S3_BUCKET = os.getenv('S3_BUCKET')
+ITERATOR_INPUT = os.getenv('ITERATOR_INPUT')
+
+
+class IteratorInput:
+    def __init__(self, event: dict):
+        self.index = event['iterator']['index']
+        self.count = event['iterator']['count']
+
+
+def get_input_from_s3():
+    s3_client = boto3.client('s3')
+    response = s3_client.get_object(Bucket=S3_BUCKET, Key=ITERATOR_INPUT)
+    file_content = response['Body'].read().decode('utf-8')
+    return json.loads(file_content)
+
+
+INPUT = get_input_from_s3()
 
 
 def lambda_handler(event, context):
-    index = event['iterator']['index'] + 1
-    client.invoke(
-        FunctionName=LAMBDA_TO_INVOKE,
-        InvocationType='Event'
-    )
+    lambda_input = IteratorInput(event)
+    index = lambda_input.index + 1
+
+    for execution in INPUT['executions']:
+        payload = json.dumps((execution['data'])).encode()
+        lambda_client.invoke(
+            FunctionName=execution['name'],
+            Payload=payload,
+            InvocationType='Event'
+        )
+
     return {
         'index': index,
-        'continue': index < event['iterator']['count'],
-        'count': event['iterator']['count']
+        'continue': index < lambda_input.count,
+        'count': lambda_input.count
     }

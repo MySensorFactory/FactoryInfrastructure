@@ -1,0 +1,246 @@
+{
+  "executions": [
+    {
+      "name": "FlowRateSimulator",
+      "data": {
+        "min_flow_rate_noise": -0.3,
+        "max_flow_rate_noise": 0.3,
+        "base_flow_rate": 5.0,
+        "label": "CompressedReturnFlowRate"
+      }
+    },
+    {
+      "name": "FlowRateSimulator",
+      "data": {
+        "min_flow_rate_noise": -0.3,
+        "max_flow_rate_noise": 0.3,
+        "base_flow_rate": 5.0,
+        "label": "NotCompressedReturnFlowRate"
+      }
+    },
+    {
+      "name": "FlowRateSimulator",
+      "data": {
+        "min_flow_rate_noise": -0.3,
+        "max_flow_rate_noise": 0.3,
+        "base_flow_rate": 8.0,
+        "label": "InputFlowRate"
+      }
+    },
+    {
+      "name": "FlowRateSimulator",
+      "data": {
+        "min_flow_rate_noise": -0.3,
+        "max_flow_rate_noise": 0.3,
+        "base_flow_rate": 8.0,
+        "label": "OutputFlowRate"
+      }
+    },
+    {
+      "name": "GasCompositionSimulator",
+      "data": {
+        "min_concentration": {
+          "h2": -0.1,
+          "n2": -0.03,
+          "nh3": 0.0,
+          "o2": -0.005,
+          "co2": -0.005
+        },
+        "max_concentration": {
+          "h2": 0.1,
+          "n2": 0.03,
+          "nh3": 0.0,
+          "o2": 0.005,
+          "co2": 0.005
+        },
+        "base_concentration": {
+          "h2": 0.7,
+          "n2": 0.2,
+          "nh3": 0.0,
+          "o2": 0.05,
+          "co2": 0.05
+        },
+        "label": "BeginGasComposition"
+      }
+    },
+    {
+      "name": "GasCompositionSimulator",
+      "data": {
+        "min_concentration": {
+          "h2": -0.07,
+          "n2": -0.03,
+          "nh3": -0.01,
+          "o2": -0.005,
+          "co2": -0.005
+        },
+        "max_concentration": {
+          "h2": 0.07,
+          "n2": 0.03,
+          "nh3": 0.01,
+          "o2": 0.005,
+          "co2": 0.005
+        },
+        "base_concentration": {
+          "h2": 0.65,
+          "n2": 0.18,
+          "nh3": 0.07,
+          "o2": 0.05,
+          "co2": 0.05
+        },
+        "label": "InputGasComposition"
+      }
+    },
+    {
+      "name": "GasCompositionSimulator",
+      "data": {
+        "min_concentration": {
+          "h2": -0.02,
+          "n2": -0.01,
+          "nh3": -0.07,
+          "o2": -0.005,
+          "co2": -0.005
+        },
+        "max_concentration": {
+          "h2": 0.02,
+          "n2": 0.01,
+          "nh3": 0.07,
+          "o2": 0.005,
+          "co2": 0.005
+        },
+        "base_concentration": {
+          "h2": 0.3,
+          "n2": 0.1,
+          "nh3": 0.5,
+          "o2": 0.05,
+          "co2": 0.05
+        },
+        "label": "OutputGasComposition"
+      }
+    },
+    {
+      "name": "GasCompositionSimulator",
+      "data": {
+        "min_concentration": {
+          "h2": -0.07,
+          "n2": -0.03,
+          "nh3": -0.01,
+          "o2": -0.005,
+          "co2": -0.005
+        },
+        "max_concentration": {
+          "h2": 0.07,
+          "n2": 0.03,
+          "nh3": 0.01,
+          "o2": 0.005,
+          "co2": 0.005
+        },
+        "base_concentration": {
+          "h2": 0.58,
+          "n2": 0.22,
+          "nh3": 0.1,
+          "o2": 0.05,
+          "co2": 0.05
+        },
+        "label": "ReturnGasComposition"
+      }
+    },
+    {
+      "name": "NoiseVibrationSimulator",
+      "data": {
+        "min_amplitude": 0.3,
+        "max_amplitude": 0.6,
+        "noise_level_min": -3,
+        "noise_level_max": 3,
+        "base_vibration_level": 100,
+        "vibration_noise": 8,
+        "base_noise": 80,
+        "label": "BeginCompressor"
+      }
+    },
+    {
+      "name": "NoiseVibrationSimulator",
+      "data": {
+        "min_amplitude": 0.2,
+        "max_amplitude": 0.7,
+        "noise_level_min": -3,
+        "noise_level_max": 3,
+        "base_vibration_level": 110,
+        "vibration_noise": 9,
+        "base_noise": 82,
+        "label": "ReturnCompressor"
+      }
+    },
+    {
+      "name": "PressureSimulator",
+      "data": {
+        "min_pressure_noise": -0.5,
+        "max_pressure_noise": 0.5,
+        "base_pressure": 4,
+        "label": "BeforeBeginCompressor"
+      }
+    },
+    {
+      "name": "PressureSimulator",
+      "data": {
+        "min_pressure_noise": -0.5,
+        "max_pressure_noise": 0.5,
+        "base_pressure": 6,
+        "label": "AfterBeginCompressor"
+      }
+    },
+    {
+      "name": "PressureSimulator",
+      "data": {
+        "min_pressure_noise": -0.5,
+        "max_pressure_noise": 0.5,
+        "base_pressure": 3,
+        "label": "BeforeReturnCompressor"
+      }
+    },
+    {
+      "name": "PressureSimulator",
+      "data": {
+        "min_pressure_noise": -0.5,
+        "max_pressure_noise": 0.5,
+        "base_pressure": 5,
+        "label": "AfterReturnCompressor"
+      }
+    },
+    {
+      "name": "TemperatureSimulator",
+      "data": {
+        "min_temperature": -20,
+        "max_temperature": 20,
+        "base_temperature": 473,
+        "label": "BeforeBoiler"
+      }
+    },
+    {
+      "name": "TemperatureSimulator",
+      "data": {
+        "min_temperature": -20,
+        "max_temperature": 20,
+        "base_temperature": 373,
+        "label": "AfterBoiler"
+      }
+    },
+    {
+      "name": "TemperatureSimulator",
+      "data": {
+        "min_temperature": -20,
+        "max_temperature": 20,
+        "base_temperature": 343,
+        "label": "Return"
+      }
+    },
+    {
+      "name": "TemperatureSimulator",
+      "data": {
+        "min_temperature": -20,
+        "max_temperature": 20,
+        "base_temperature": 423,
+        "label": "Begin"
+      }
+    }
+  ]
+}
