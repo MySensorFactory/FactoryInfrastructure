@@ -466,7 +466,7 @@ Resources:
             Value: factory-ci-cd
           - Name: S3_LAMBDAS_DESTINATION
             Type: PLAINTEXT
-            Value: application/lambda
+            Value: applications/lambda
           - Name: PROJECT_NAME
             Type: PLAINTEXT
             Value: infrastructure

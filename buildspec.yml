@@ -4,7 +4,7 @@ env:
     variables:
         PROJECT_NAME: infrastructure
         BUCKET_NAME: factory-ci-cd
-        S3_LAMBDAS_DESTINATION: application/lambda
+        S3_LAMBDAS_DESTINATION: applications/lambda
         LAMBDAS_SOURCE_FOLDER: lambda_functions
 
 phases: 
