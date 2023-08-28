@@ -1,0 +1,32 @@
+version: 0.2
+
+env:
+    variables:
+        PROJECT_NAME: infrastructure
+        BUCKET_NAME: factory-ci-cd
+        S3_LAMBDAS_DESTINATION: application/lambda
+        LAMBDAS_SOURCE_FOLDER: lambda_functions
+
+phases: 
+    install:
+        runtime-versions:
+            python: 3.8
+        commands:
+            - apt update -y
+    pre_build:
+        commands:
+            - echo "Pre build commands ..."
+    build:
+        commands:
+            - echo "Building infrastructure ..."
+            - echo "Uploading lambdas ..."
+            - python3 update_lambdas.py
+    post_build:
+        commands:
+            - echo "Post build commands  ..."
+cache:
+    paths:
+        - '/root/.m2/**/*'
+        - '/root/.npm/**/*'
+        - '/root/.pip-cache/**/*'
+        - '/root/.docker/**'
