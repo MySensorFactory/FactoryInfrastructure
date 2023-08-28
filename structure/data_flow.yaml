@@ -6,13 +6,33 @@ Parameters:
     Type: String
     Default: factory-ci-cd
     Description: Factory bucket name
-  S3FactoryDataSimulatorKeyParam:
+  S3FlowRateSimulatorKeyParam:
     Type: String
-    Default: applications/lambda/factory_data_simulator.zip
-    Description: Factory key param
+    Default: applications/lambda/flow_rate_simulator.zip
+    Description: Gas flow rate simulator key param
+  S3GasCompositionSimulatorKeyParam:
+    Type: String
+    Default: applications/lambda/gas_composition_simulator.zip
+    Description: Gas composition key simulator param
+  S3NoiseVibrationSimulatorKeyParam:
+    Type: String
+    Default: applications/lambda/noise_vibration_simulator.zip
+    Description: Noise and vibration key simulator param
+  S3PressureSimulatorKeyParam:
+    Type: String
+    Default: applications/lambda/pressure_simulator.zip
+    Description: Pressure key simulator param
+  S3TemperatureSimulatorKeyParam:
+    Type: String
+    Default: applications/lambda/temperature_simulator.zip
+    Description: Pressure key simulator param
   S3FactoryDataSimulatorIteratorKeyParam:
     Type: String
     Default: applications/lambda/iterator.zip
+    Description: Factory key param
+  S3IteratorInputKeyParam:
+    Type: String
+    Default: applications/lambda/iterator_input.json
     Description: Factory key param
   S3FactoryDataSimulatorIteratorStateMachineKeyParam:
     Type: String
@@ -28,13 +48,45 @@ Parameters:
     Default: 781648067507
 
 Resources:
-  FactoryDataSNSTopic:
+  FlowRateSNSTopic:
     Type: AWS::SNS::Topic
     Properties:
-      DisplayName: FactoryDataTopic
+      DisplayName: FlowRateSNSTopic
       FifoTopic: true
       ContentBasedDeduplication: true
-    Description: SNS topic for factory data
+    Description: Flow rate simulator
+
+  GasCompositionSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: GasCompositionSNSTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+    Description: Gas composition simulator
+
+  NoiseVibrationSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: NoiseVibrationSNSTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+    Description: Noise and vibration simulator
+
+  PressureSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: PressureSNSTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+    Description: Pressure simulator
+
+  TemperatureSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: TemperatureSNSTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+    Description: Temperature simulator
 
   PressureSQSQueue:
     Type: AWS::SQS::Queue
@@ -48,29 +100,63 @@ Resources:
       QueueName: TemperatureSQSQueue
     Description: SQS queue for temperature data
 
+  FlowRateSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: FlowRateSQSQueue
+    Description: SQS queue for flow rate data
+
+  GasCompositionSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: GasCompositionSQSQueue
+    Description: SQS queue for gas composition data
+
+  NoiseVibrationSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: NoiseVibrationSQSQueue
+    Description: SQS queue for noise and vibration data
+
   PressureFactoryDataSNSTopicSubscription:
     Type: AWS::SNS::Subscription
     Properties:
-      FilterPolicyScope: MessageBody
-      FilterPolicy:
-        sensor:
-          - Pressure
       Endpoint: !GetAtt PressureSQSQueue.Arn
       Protocol: sqs
-      TopicArn: !Ref FactoryDataSNSTopic
+      TopicArn: !Ref PressureSNSTopic
     Description: Subscription for PressureSQSQueue to FactoryDataSNSTopic
 
   TemperatureFactoryDataSNSTopicSubscription:
     Type: AWS::SNS::Subscription
     Properties:
-      FilterPolicyScope: MessageBody
-      FilterPolicy:
-        sensor:
-          - Temperature
       Endpoint: !GetAtt TemperatureSQSQueue.Arn
       Protocol: sqs
-      TopicArn: !Ref FactoryDataSNSTopic
+      TopicArn: !Ref TemperatureSNSTopic
     Description: Subscription for TemperatureSQSQueue to FactoryDataSNSTopic
+
+  FlowRateFactoryDataSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      TopicArn: !Ref FlowRateSNSTopic
+      Endpoint: !GetAtt FlowRateSQSQueue.Arn
+    Description: Subscription for FlowRateSQSQueue to FlowRateSNSTopic
+
+  GasCompositionFactoryDataSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      TopicArn: !Ref GasCompositionSNSTopic
+      Endpoint: !GetAtt GasCompositionSQSQueue.Arn
+    Description: Subscription for GasCompositionSQSQueue to GasCompositionSNSTopic
+
+  NoiseVibrationFactoryDataSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      TopicArn: !Ref NoiseVibrationSNSTopic
+      Endpoint: !GetAtt NoiseVibrationSQSQueue.Arn
+    Description: Subscription for NoiseVibrationSQSQueue to NoiseVibrationSNSTopic
 
   PressureSQSQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -87,7 +173,7 @@ Resources:
             Resource: !GetAtt PressureSQSQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn: !Ref FactoryDataSNSTopic
+                aws:SourceArn: "FlowRateSNSTopic"
 
   TemperatureSQSQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -104,7 +190,7 @@ Resources:
             Resource: !GetAtt TemperatureSQSQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn: !Ref FactoryDataSNSTopic
+                aws:SourceArn: "FlowRateSNSTopic"
 
   LambdaRole:
     Type: AWS::IAM::Role
@@ -136,26 +222,87 @@ Resources:
                 Resource: !Sub arn:aws:logs:${RegionParam}:${AccountIdParam}:log-group:/aws/lambda/*
               - Effect: Allow
                 Action: sns:Publish
-                Resource: !Ref FactoryDataSNSTopic
+                Resource:
+                  - !Ref FlowRateSNSTopic
+                  - !Ref GasCompositionSNSTopic
+                  - !Ref NoiseVibrationSNSTopic
+                  - !Ref PressureSNSTopic
+                  - !Ref TemperatureSNSTopic
 
-  LambdaFunction:
+  FlowRateSimulatorLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: FactoryDataSimulator
+      FunctionName: FlowRateSimulator
       Code:
         S3Bucket: !Ref S3BucketParam
-        S3Key: !Ref S3FactoryDataSimulatorKeyParam
-      Handler: factory_sns_topic_data_simulator.lambda_handler
+        S3Key: !Ref S3FlowRateSimulatorKeyParam
+      Handler: flow_rate_simulator.lambda_handler
       Runtime: python3.8
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
-          TOPIC_ARN: !Ref FactoryDataSNSTopic
+          TOPIC_ARN: !Ref FlowRateSNSTopic
 
-  LambdaFunctionIterator:
+  GasCompositionSimulatorLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: FactoryDataSimulatorIterator
+      FunctionName: GasCompositionSimulator
+      Code:
+        S3Bucket: !Ref S3BucketParam
+        S3Key: !Ref S3GasCompositionSimulatorKeyParam
+      Handler: gas_composition_simulator.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TOPIC_ARN: !Ref GasCompositionSNSTopic
+
+  NoiseVibrationSimulatorLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: NoiseVibrationSimulator
+      Code:
+        S3Bucket: !Ref S3BucketParam
+        S3Key: !Ref S3NoiseVibrationSimulatorKeyParam
+      Handler: noise_vibration_simulator.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TOPIC_ARN: !Ref NoiseVibrationSNSTopic
+
+  PressureSimulatorLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: PressureSimulator
+      Code:
+        S3Bucket: !Ref S3BucketParam
+        S3Key: !Ref S3PressureSimulatorKeyParam
+      Handler: pressure_simulator.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TOPIC_ARN: !Ref PressureSNSTopic
+
+  TemperatureSimulatorLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: TemperatureSimulator
+      Code:
+        S3Bucket: !Ref S3BucketParam
+        S3Key: !Ref S3TemperatureSimulatorKeyParam
+      Handler: temperature_simulator.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TOPIC_ARN: !Ref TemperatureSNSTopic
+
+  IteratorLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: Iterator
       Code:
         S3Bucket: !Ref S3BucketParam
         S3Key: !Ref S3FactoryDataSimulatorIteratorKeyParam
@@ -164,7 +311,8 @@ Resources:
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
-          LAMBDA_TO_INVOKE: !Ref LambdaFunction
+          S3_BUCKET: !Ref S3BucketParam
+          ITERATOR_INPUT: !Ref S3IteratorInputKeyParam
 
   StepFunctionRole:
     Type: AWS::IAM::Role
@@ -184,16 +332,16 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: lambda:InvokeFunction
-                Resource: !Sub ${LambdaFunctionIterator.Arn}
+                Resource: !Sub ${IteratorLambdaFunction.Arn}
               - Effect: Allow
                 Action: lambda:InvokeFunction
-                Resource: !Sub ${LambdaFunctionIterator.Arn}:*
+                Resource: !Sub ${IteratorLambdaFunction.Arn}:*
 
-  FactoryDataSimulatorStepFunction:
+  RepeaterStepFunction:
     Type: AWS::StepFunctions::StateMachine
     Properties:
       DefinitionSubstitutions:
-        IteratorLambdaFunction: !GetAtt LambdaFunctionIterator.Arn
+        IteratorLambdaFunction: !GetAtt IteratorLambdaFunction.Arn
       DefinitionS3Location:
         Bucket: !Ref S3BucketParam
         Key: !Ref S3FactoryDataSimulatorIteratorStateMachineKeyParam
@@ -210,13 +358,13 @@ Resources:
               Service: events.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: FactoryDataSimulatorStepFunctionExecutionPolicy
+        - PolicyName: RepeaterStepFunctionExecutionPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action: states:StartExecution
-                Resource: !GetAtt FactoryDataSimulatorStepFunction.Arn
+                Resource: !Ref RepeaterStepFunction
 
   ScheduleRule:
     Type: AWS::Events::Rule
@@ -226,15 +374,111 @@ Resources:
       ScheduleExpression: "rate(1 minute)"
       State: ENABLED
       Targets:
-        - Arn: !GetAtt FactoryDataSimulatorStepFunction.Arn
-          Id: FactoryDataSimulatorStepFunction
+        - Arn: !GetAtt RepeaterStepFunction.Arn
+          Id: RepeaterStepFunction
           RoleArn: !GetAtt StepFunctionExecutionRole.Arn
           Input: "{ \"input\": {} }"
+
+  CodeBuildPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: VisualEditor0
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketAcl
+              - s3:PutObject
+              - s3:GetObject
+              - s3:GetBucketLocation
+              - s3:GetObjectVersion
+              - logs:CreateLogGroup
+              - logs:PutLogEvents
+              - logs:CreateLogStream
+              - codebuild:CreateReportGroup
+              - codebuild:CreateReport
+              - codebuild:UpdateReport
+              - codebuild:BatchPutCodeCoverages
+              - codebuild:BatchPutTestCases
+              - codeartifact:GetAuthorizationToken
+              - codeartifact:ReadFromRepository
+              - codeartifact:GetRepositoryEndpoint
+              - codeartifact:PutPackageMetadata
+              - codeartifact:PublishPackageVersion
+            Resource:
+              - arn:aws:codeartifact:eu-central-1:781648067507:repository/factory/FactoryRepository
+              - arn:aws:codeartifact:eu-central-1:781648067507:package/factory/FactoryRepository/*/*/*
+              - arn:aws:codeartifact:eu-central-1:781648067507:domain/factory
+              - arn:aws:s3:::factory-ci-cd-*
+              - arn:aws:s3:::codepipeline-eu-central-1-*
+              - arn:aws:logs:eu-central-1:781648067507:log-group:/aws/codebuild/*
+              - arn:aws:codebuild:eu-central-1:781648067507:report-group/*
+          - Sid: VisualEditor1
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:CreateBucket
+              - s3:List*
+              - sts:GetServiceBearerToken
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeDhcpOptions
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:DescribeSubnets
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeVpcs
+            Resource: '*'
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CodeBuildPolicy
+
+  InfrastructureCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: InfrastructureCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: LAMBDAS_SOURCE_FOLDER
+            Type: PLAINTEXT
+            Value: lambda_functions
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: S3_LAMBDAS_DESTINATION
+            Type: PLAINTEXT
+            Value: application/lambda
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: infrastructure
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/FactoryInfrastructure.git
+        GitCloneDepth: 1
 
 Outputs:
   FactoryDataSNSTopic:
     Description: ARN of the created SNS Topic
-    Value: !Ref FactoryDataSNSTopic
+    Value: "FlowRateSNSTopic"
 
   PressureSQSQueueURL:
     Description: URL of the pressure SQS Queue
