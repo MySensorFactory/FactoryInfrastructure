@@ -6,7 +6,7 @@
         "min_flow_rate_noise": -0.3,
         "max_flow_rate_noise": 0.3,
         "base_flow_rate": 5.0,
-        "label": "CompressedReturnFlowRate"
+        "label": "CompressedReturn"
       }
     },
     {
@@ -15,7 +15,7 @@
         "min_flow_rate_noise": -0.3,
         "max_flow_rate_noise": 0.3,
         "base_flow_rate": 5.0,
-        "label": "NotCompressedReturnFlowRate"
+        "label": "NotCompressedReturn"
       }
     },
     {
@@ -24,7 +24,7 @@
         "min_flow_rate_noise": -0.3,
         "max_flow_rate_noise": 0.3,
         "base_flow_rate": 8.0,
-        "label": "InputFlowRate"
+        "label": "Input"
       }
     },
     {
@@ -33,7 +33,7 @@
         "min_flow_rate_noise": -0.3,
         "max_flow_rate_noise": 0.3,
         "base_flow_rate": 8.0,
-        "label": "OutputFlowRate"
+        "label": "Output"
       }
     },
     {
@@ -60,7 +60,7 @@
           "o2": 0.05,
           "co2": 0.05
         },
-        "label": "BeginGasComposition"
+        "label": "Begin"
       }
     },
     {
@@ -87,7 +87,7 @@
           "o2": 0.05,
           "co2": 0.05
         },
-        "label": "InputGasComposition"
+        "label": "Input"
       }
     },
     {
@@ -114,7 +114,7 @@
           "o2": 0.05,
           "co2": 0.05
         },
-        "label": "OutputGasComposition"
+        "label": "Output"
       }
     },
     {
@@ -141,7 +141,7 @@
           "o2": 0.05,
           "co2": 0.05
         },
-        "label": "ReturnGasComposition"
+        "label": "ReturnGas"
       }
     },
     {
