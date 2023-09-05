@@ -40,13 +40,15 @@ class SensorData(Jsonable):
         return {
             "label": self.label,
             "timestamp": self.timestamp,
-            "flow_rate": self.flow_rate.to_json()
+            "flow_rate": self.flow_rate.to_json(),
+            'event_key': self.event_key
         }
 
-    def __init__(self, timestamp: int, flow_rate: FlowRateData, label: str):
+    def __init__(self, timestamp: int, flow_rate: FlowRateData, label: str, event_key: str):
         self.timestamp = timestamp
         self.flow_rate = flow_rate
         self.label = label
+        self.event_key = event_key
 
 
 def generate_data(event, context):
@@ -54,12 +56,13 @@ def generate_data(event, context):
     max_flow_rate = float(event['max_flow_rate_noise'])
     base_flow_rate = float(event['base_flow_rate'])
     label = event['label']
+    event_key = event['event_key']
 
     timestamp = int(time.time())
     flow_rate = base_flow_rate + random.uniform(min_flow_rate, max_flow_rate)
 
     flow_rate_data = FlowRateData(flow_rate)
-    sensor_data = SensorData(timestamp, flow_rate_data, label)
+    sensor_data = SensorData(timestamp, flow_rate_data, label, event_key)
 
     sns_response = publish_to_sns(sensor_data)
 

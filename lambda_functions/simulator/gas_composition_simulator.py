@@ -48,13 +48,15 @@ class SensorData(Jsonable):
         return {
             "label": self.label,
             "timestamp": self.timestamp,
-            "gas_composition": self.gas_composition.to_json()
+            "gas_composition": self.gas_composition.to_json(),
+            'event_key': self.event_key
         }
 
-    def __init__(self, timestamp: int, gas_composition: GasComposition, label: str):
+    def __init__(self, timestamp: int, gas_composition: GasComposition, label: str, event_key: str):
         self.timestamp = timestamp
         self.gas_composition = gas_composition
         self.label = label
+        self.event_key = event_key
 
 
 time_elapsed = 0
@@ -66,6 +68,7 @@ ONE_MINUTE = 60
 def generate_data(event, context):
     global time_elapsed
     label = event['label']
+    event_key = event['event_key']
 
     timestamp = int(time.time())
 
@@ -80,7 +83,7 @@ def generate_data(event, context):
     co2 = base_concentration["co2"] + random.uniform(min_concentration["co2"], max_concentration["co2"])
 
     gas_composition = GasComposition(h2, n2, nh3, o2, co2)
-    sensor_data = SensorData(timestamp, gas_composition, label)
+    sensor_data = SensorData(timestamp, gas_composition, label, event_key)
 
     sns_response = publish_to_sns(sensor_data)
 

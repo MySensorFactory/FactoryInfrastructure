@@ -40,13 +40,18 @@ class SensorData(Jsonable):
         return {
             "label": self.label,
             "timestamp": self.timestamp,
-            "temperature": self.temperature.to_json()
+            "temperature": self.temperature.to_json(),
+            'event_key': self.event_key
         }
 
-    def __init__(self, timestamp: int, temperature: TemperatureData, label: str):
+    def __init__(self, timestamp: int,
+                 temperature: TemperatureData,
+                 label: str,
+                 event_key: str):
         self.timestamp = timestamp
         self.temperature = temperature
         self.label = label
+        self.event_key = event_key
 
 
 def generate_data(event, context):
@@ -54,12 +59,13 @@ def generate_data(event, context):
     max_temperature = float(event['max_temperature'])
     base_temperature = float(event['base_temperature'])
     label = event['label']
+    event_key = event['event_key']
 
     timestamp = int(time.time())
     temperature = base_temperature + random.uniform(min_temperature, max_temperature)
 
     temperature_data = TemperatureData(temperature)
-    sensor_data = SensorData(timestamp, temperature_data, label)
+    sensor_data = SensorData(timestamp, temperature_data, label, event_key)
 
     sns_response = publish_to_sns(sensor_data)
 

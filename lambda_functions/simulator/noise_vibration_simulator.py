@@ -54,17 +54,20 @@ class SensorData(Jsonable):
             "label": self.label,
             "timestamp": self.timestamp,
             "noise": self.noise.to_json(),
-            "vibration": self.vibration.to_json()
+            "vibration": self.vibration.to_json(),
+            'event_key': self.event_key
         }
 
     def __init__(self, timestamp: int,
                  vibration: VibrationData,
                  noise: NoiseData,
-                 label: str):
+                 label: str,
+                 event_key: str):
         self.timestamp = timestamp
         self.vibration = vibration
         self.noise = noise
         self.label = label
+        self.event_key = event_key
 
 
 time_elapsed = 0
@@ -83,6 +86,7 @@ def generate_data(event, context):
     vibration_noise = int(event['vibration_noise'])
     base_noise = int(event['base_noise'])
     label = event['label']
+    event_key = event['event_key']
 
     timestamp = int(time.time())
     vibration_amplitude = (min_amplitude + max_amplitude) / 2 * random.uniform(min_amplitude, max_amplitude)
@@ -93,7 +97,7 @@ def generate_data(event, context):
 
     vibration_data = VibrationData(vibration_amplitude, vibration_frequency)
     noise_data = NoiseData(noise_level)
-    sensor_data = SensorData(timestamp, vibration_data, noise_data, label)
+    sensor_data = SensorData(timestamp, vibration_data, noise_data, label, event_key)
 
     sns_response = publish_to_sns(sensor_data)
 

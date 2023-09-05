@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 
 import boto3
 
@@ -28,8 +29,10 @@ INPUT = get_input_from_s3()
 def lambda_handler(event, context):
     lambda_input = IteratorInput(event)
     index = lambda_input.index + 1
+    event_key = uuid.uuid4()
 
     for execution in INPUT['executions']:
+        execution['data']['event_key'] = event_key
         payload = json.dumps((execution['data'])).encode()
         lambda_client.invoke(
             FunctionName=execution['name'],
