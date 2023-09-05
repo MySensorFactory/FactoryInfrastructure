@@ -29,7 +29,7 @@ INPUT = get_input_from_s3()
 def lambda_handler(event, context):
     lambda_input = IteratorInput(event)
     index = lambda_input.index + 1
-    event_key = uuid.uuid4()
+    event_key = str(uuid.uuid4())
 
     for execution in INPUT['executions']:
         execution['data']['event_key'] = event_key
