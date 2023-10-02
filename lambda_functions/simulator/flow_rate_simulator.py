@@ -1,70 +1,41 @@
-import json
 import os
 import random
 import time
-import uuid
-from abc import abstractmethod
 
-import boto3
+from pydantic import BaseModel
 
-sns_client = boto3.client('sns')
+from commons import SensorData, SnsClient
+
+sns_client = SnsClient()
 TOPIC_ARN = os.getenv('TOPIC_ARN')
 
 
-class Jsonable:
-    @abstractmethod
-    def to_json(self) -> dict: pass
+class FlowRate(SensorData):
+    flow_rate: float
 
 
-def publish_to_sns(message: Jsonable):
-    response = sns_client.publish(
-        TopicArn=TOPIC_ARN,
-        Message=json.dumps(message.to_json()),
-        MessageGroupId=str(uuid.uuid4())
-    )
-    return response
-
-
-class FlowRateData(Jsonable):
-    def to_json(self):
-        return {
-            "flow_rate": self.flow_rate
-        }
-
-    def __init__(self, flow_rate: float):
-        self.flow_rate = flow_rate
-
-
-class SensorData(Jsonable):
-    def to_json(self):
-        return {
-            "label": self.label,
-            "timestamp": self.timestamp,
-            "flow_rate": self.flow_rate.to_json(),
-            'event_key': self.event_key
-        }
-
-    def __init__(self, timestamp: int, flow_rate: FlowRateData, label: str, event_key: str):
-        self.timestamp = timestamp
-        self.flow_rate = flow_rate
-        self.label = label
-        self.event_key = event_key
+class FlowRateInput(BaseModel):
+    min_flow_rate_noise: float
+    max_flow_rate_noise: float
+    base_flow_rate: float
+    label: str
+    event_key: str
 
 
 def generate_data(event, context):
-    min_flow_rate = float(event['min_flow_rate_noise'])
-    max_flow_rate = float(event['max_flow_rate_noise'])
-    base_flow_rate = float(event['base_flow_rate'])
-    label = event['label']
-    event_key = event['event_key']
+    input_data = FlowRateInput(**event)
 
     timestamp = int(time.time())
-    flow_rate = base_flow_rate + random.uniform(min_flow_rate, max_flow_rate)
+    flow_rate = input_data.base_flow_rate + \
+                random.uniform(input_data.min_flow_rate_noise, input_data.max_flow_rate_noise)
 
-    flow_rate_data = FlowRateData(flow_rate)
-    sensor_data = SensorData(timestamp, flow_rate_data, label, event_key)
+    flow_rate_data = FlowRate(flow_rate=flow_rate,
+                              label=input_data.label,
+                              timestamp=timestamp,
+                              event_key=input_data.event_key)
 
-    sns_response = publish_to_sns(sensor_data)
+    sns_response = sns_client.publish(message=flow_rate_data,
+                                      topic_arn=TOPIC_ARN)
 
     return {
         "statusCode": 200,
