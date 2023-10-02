@@ -1,73 +1,46 @@
-import json
 import os
 import random
 import time
-import uuid
-from abc import abstractmethod
 
-import boto3
+from pydantic import BaseModel
 
-sns_client = boto3.client('sns')
+from commons import SensorData, SnsClient
+
+sns_client = SnsClient()
 TOPIC_ARN = os.getenv('TOPIC_ARN')
 
 
-class Jsonable:
-    @abstractmethod
-    def to_json(self): pass
+class TemperatureData(BaseModel):
+    temperature: float
 
 
-def publish_to_sns(message: Jsonable):
-    response = sns_client.publish(
-        TopicArn=TOPIC_ARN,
-        Message=json.dumps(message.to_json()),
-        MessageGroupId=str(uuid.uuid4())
-    )
-    return response
+class Temperature(SensorData):
+    temperature: TemperatureData
 
 
-class TemperatureData(Jsonable):
-    def to_json(self):
-        return {
-            "temperature": self.temperature
-        }
-
-    def __init__(self, temperature: float):
-        self.temperature = temperature
-
-
-class SensorData(Jsonable):
-    def to_json(self):
-        return {
-            "label": self.label,
-            "timestamp": self.timestamp,
-            "temperature": self.temperature.to_json(),
-            'event_key': self.event_key
-        }
-
-    def __init__(self, timestamp: int,
-                 temperature: TemperatureData,
-                 label: str,
-                 event_key: str):
-        self.timestamp = timestamp
-        self.temperature = temperature
-        self.label = label
-        self.event_key = event_key
+class TemperatureInput(BaseModel):
+    min_temperature: float
+    max_temperature: float
+    base_temperature: float
+    label: str
+    event_key: str
 
 
 def generate_data(event, context):
-    min_temperature = float(event['min_temperature'])
-    max_temperature = float(event['max_temperature'])
-    base_temperature = float(event['base_temperature'])
-    label = event['label']
-    event_key = event['event_key']
+    input_data = TemperatureInput(**event)
 
     timestamp = int(time.time())
-    temperature = base_temperature + random.uniform(min_temperature, max_temperature)
+    temperature = input_data.base_temperature + random.uniform(input_data.min_temperature,
+                                                               input_data.max_temperature)
 
-    temperature_data = TemperatureData(temperature)
-    sensor_data = SensorData(timestamp, temperature_data, label, event_key)
+    temperature_data = TemperatureData(temperature=temperature)
+    sensor_data = Temperature(temperature=temperature_data,
+                              label=input_data.label,
+                              timestamp=timestamp,
+                              event_key=input_data.event_key)
 
-    sns_response = publish_to_sns(sensor_data)
+    sns_response = sns_client.publish(message=sensor_data,
+                                      topic_arn=TOPIC_ARN)
 
     return {
         "statusCode": 200,
