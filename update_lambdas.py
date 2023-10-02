@@ -18,10 +18,11 @@ def is_python_script(s3_file: str) -> bool:
 
 def create_zip_file(zip_path: str, file_path: str):
     with zipfile.ZipFile(zip_path, 'w') as zipf:
+        arch_path =os.path.split(file_path)[-1]
         if file_path.endswith('commons.py'):
             zipf.mkdir('python')
-            file_path = 'python/' + file_path
-        zipf.write(file_path, os.path.split(file_path)[-1])
+            arch_path = 'python/' + arch_path
+        zipf.write(file_path,arch_path )
 
 
 def upload_file(zip_path: str, dest_file: str):
