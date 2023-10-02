@@ -20,6 +20,7 @@ def create_zip_file(zip_path: str, file_path: str):
     with zipfile.ZipFile(zip_path, 'w') as zipf:
         if file_path.endswith('commons.py'):
             zipf.mkdir('python')
+            file_path = 'python/' + file_path
         zipf.write(file_path, os.path.split(file_path)[-1])
 
 
