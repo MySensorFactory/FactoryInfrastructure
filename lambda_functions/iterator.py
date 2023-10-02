@@ -3,6 +3,7 @@ import os
 import uuid
 
 import boto3
+from pydantic import BaseModel
 
 lambda_client = boto3.client('lambda')
 
@@ -10,13 +11,16 @@ S3_BUCKET = os.getenv('S3_BUCKET')
 ITERATOR_INPUT = os.getenv('ITERATOR_INPUT')
 
 
-class IteratorInput:
-    def __init__(self, event: dict):
-        self.index = event['iterator']['index']
-        self.count = event['iterator']['count']
+class IteratorData(BaseModel):
+    index: int
+    count: int
 
 
-def get_input_from_s3():
+class IteratorInput(BaseModel):
+    iterator: IteratorData
+
+
+def get_input_from_s3() -> dict:
     s3_client = boto3.client('s3')
     response = s3_client.get_object(Bucket=S3_BUCKET, Key=ITERATOR_INPUT)
     file_content = response['Body'].read().decode('utf-8')
@@ -27,8 +31,8 @@ INPUT = get_input_from_s3()
 
 
 def lambda_handler(event, context):
-    lambda_input = IteratorInput(event)
-    index = lambda_input.index + 1
+    lambda_input = IteratorInput(**event)
+    index = lambda_input.iterator.index + 1
     event_key = str(uuid.uuid4())
 
     for execution in INPUT['executions']:
@@ -42,6 +46,6 @@ def lambda_handler(event, context):
 
     return {
         'index': index,
-        'continue': index < lambda_input.count,
-        'count': lambda_input.count
+        'continue': index < lambda_input.iterator.count,
+        'count': lambda_input.iterator.count
     }
