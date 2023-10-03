@@ -1,4 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
+Transform: 'AWS::Serverless-2016-10-31'
 Description: CloudFormation Template to create SNS topic and SQS queues
 
 Parameters:
@@ -6,6 +7,10 @@ Parameters:
     Type: String
     Default: factory-ci-cd
     Description: Factory bucket name
+  S3CommonsKeyParam:
+    Type: String
+    Default: applications/lambda/commons.zip
+    Description: Commons key param
   S3FlowRateSimulatorKeyParam:
     Type: String
     Default: applications/lambda/flow_rate_simulator.zip
@@ -288,11 +293,15 @@ Resources:
         S3Bucket: !Ref S3BucketParam
         S3Key: !Ref S3FlowRateSimulatorKeyParam
       Handler: flow_rate_simulator.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.11
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
           TOPIC_ARN: !Ref FlowRateSNSTopic
+      Layers:
+        - !Ref PowertoolsLambdaLayer
+        - !Ref CommonsLambdaLayer
+
 
   GasCompositionSimulatorLambdaFunction:
     Type: AWS::Lambda::Function
@@ -302,11 +311,14 @@ Resources:
         S3Bucket: !Ref S3BucketParam
         S3Key: !Ref S3GasCompositionSimulatorKeyParam
       Handler: gas_composition_simulator.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.11
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
           TOPIC_ARN: !Ref GasCompositionSNSTopic
+      Layers:
+        - !Ref PowertoolsLambdaLayer
+        - !Ref CommonsLambdaLayer
 
   NoiseVibrationSimulatorLambdaFunction:
     Type: AWS::Lambda::Function
@@ -316,11 +328,14 @@ Resources:
         S3Bucket: !Ref S3BucketParam
         S3Key: !Ref S3NoiseVibrationSimulatorKeyParam
       Handler: noise_vibration_simulator.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.11
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
           TOPIC_ARN: !Ref NoiseVibrationSNSTopic
+      Layers:
+        - !Ref PowertoolsLambdaLayer
+        - !Ref CommonsLambdaLayer
 
   PressureSimulatorLambdaFunction:
     Type: AWS::Lambda::Function
@@ -330,11 +345,14 @@ Resources:
         S3Bucket: !Ref S3BucketParam
         S3Key: !Ref S3PressureSimulatorKeyParam
       Handler: pressure_simulator.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.11
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
           TOPIC_ARN: !Ref PressureSNSTopic
+      Layers:
+        - !Ref PowertoolsLambdaLayer
+        - !Ref CommonsLambdaLayer
 
   TemperatureSimulatorLambdaFunction:
     Type: AWS::Lambda::Function
@@ -344,11 +362,14 @@ Resources:
         S3Bucket: !Ref S3BucketParam
         S3Key: !Ref S3TemperatureSimulatorKeyParam
       Handler: temperature_simulator.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.11
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
           TOPIC_ARN: !Ref TemperatureSNSTopic
+      Layers:
+        - !Ref PowertoolsLambdaLayer
+        - !Ref CommonsLambdaLayer
 
   IteratorLambdaFunction:
     Type: AWS::Lambda::Function
@@ -358,12 +379,40 @@ Resources:
         S3Bucket: !Ref S3BucketParam
         S3Key: !Ref S3FactoryDataSimulatorIteratorKeyParam
       Handler: iterator.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.11
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
           S3_BUCKET: !Ref S3BucketParam
           ITERATOR_INPUT: !Ref S3IteratorInputKeyParam
+      Layers:
+        - !Ref PowertoolsLambdaLayer
+        - !Ref CommonsLambdaLayer
+
+  PowertoolsLambdaLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      Description: AWS Lambda Layer for aws-lambda-powertools version 2.25.1
+      LayerName: aws-lambda-powertools-python-layer
+      ContentUri:
+        Bucket: awsserverlessrepo-changesets-1xxlnameudh3r
+        Key: 781648067507/arn:aws:serverlessrepo:eu-west-1:057560766410:applications-aws-lambda-powertools-python-layer-versions-2.25.1/2808c803-98e5-4e17-a82c-80f7db4cbe0f
+      CompatibleRuntimes:
+        - python3.11
+      LicenseInfo: Available under the Apache-2.0 license.
+      RetentionPolicy: Retain
+    Metadata:
+      SamResourceId: LambdaLayer
+
+  CommonsLambdaLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: CommonsLambdaLayer
+      Content:
+        S3Bucket: !Ref S3BucketParam
+        S3Key: !Ref S3CommonsKeyParam
+      CompatibleRuntimes:
+        - python3.11
 
   StepFunctionRole:
     Type: AWS::IAM::Role
@@ -538,3 +587,10 @@ Outputs:
   TemperatureSQSQueueURL:
     Description: URL of the temperature SQS Queue
     Value: !Ref TemperatureSQSQueue
+
+  PowertoolsLayerVersionArn:
+    Description: ARN for the published Layer version
+    Value: !Ref PowertoolsLambdaLayer
+    Export:
+      Name:
+        Fn::Sub: PowertoolsLayerVersionArn-${AWS::StackName}
