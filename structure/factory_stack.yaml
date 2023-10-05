@@ -42,7 +42,7 @@ Parameters:
     Type: String
     Default: "0.0.0.0/0"
 
-  FactoryKeyPairNameParam:
+  KeyPairNameParam:
     Description: Factory EC2 Kubernetes cluster keypair name
     Type: String
     Default: FactoryKeyPair
@@ -72,6 +72,112 @@ Parameters:
       - t2.medium
       - t3.medium
       - t3.micro
+
+  CommonNodeInitScriptParam:
+    Type: String
+    Default: |
+      #!/bin/bash
+      set -euxo pipefail
+      KUBERNETES_VERSION="1.28.1-00"
+      sudo swapoff -a
+      (crontab -l 2>/dev/null; echo "@reboot /sbin/swapoff -a") | crontab - || true
+      sudo apt-get update -y
+      OS="xUbuntu_20.04"
+      VERSION="1.28"
+
+      # Create the .conf file to load the modules at bootup
+      cat <<EOF | sudo tee /etc/modules-load.d/crio.conf
+      overlay
+      br_netfilter
+      EOF
+
+      sudo modprobe overlay
+      sudo modprobe br_netfilter
+
+      # Set up required sysctl params, these persist across reboots.
+      cat <<EOF | sudo tee /etc/sysctl.d/99-kubernetes-cri.conf
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.ipv4.ip_forward                 = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      EOF
+
+      sudo sysctl --system
+
+      cat <<EOF | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
+      deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/ /
+      EOF
+      cat <<EOF | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$VERSION.list
+      deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$VERSION/$OS/ /
+      EOF
+
+      curl -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$VERSION/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers.gpg add -
+      curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers.gpg add -
+
+      sudo apt-get update
+      sudo apt-get install cri-o cri-o-runc -y
+
+      sudo systemctl daemon-reload
+      sudo systemctl enable crio --now
+
+      echo "CRI runtime installed susccessfully"
+
+      # Install kubelet, kubectl and Kubeadm
+      sudo apt-get update -y
+      sudo apt-get install -y apt-transport-https ca-certificates curl
+      sudo curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://dl.k8s.io/apt/doc/apt-key.gpg
+
+      echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+      sudo apt-get update -y
+      sudo apt-get install -y kubelet="$KUBERNETES_VERSION" kubectl="$KUBERNETES_VERSION" kubeadm="$KUBERNETES_VERSION"
+      sudo apt-get update -y
+      sudo apt-get install -y jq
+
+      local_ip="$(ip --json addr show ens5 | jq -r '.[0].addr_info[] | select(.family == "inet") | .local')" ###
+      cat > /etc/default/kubelet << EOF
+      KUBELET_EXTRA_ARGS=--node-ip=$local_ip
+      EOF
+      
+      # install python3 tools
+      sudo apt install python3-pip -y
+      pip3 install awscli
+
+  MasterNodeInitScriptParam:
+    Type: String
+    Default: |
+      #!/bin/bash
+      # Setup for Control Plane (Master) servers
+      set -euxo pipefail
+      
+      NODENAME=$(hostname -s)
+      POD_CIDR="192.168.0.0/16"
+      INTERFACE_NAME=ens5
+      HOME=/home/ubuntu
+      KUBE_CFG_DIR="$HOME"/.kube/config
+      DEFAULT_USER=ubuntu
+      KUBE_JOIN_TOKEN="/CICD/KUBE_JOIN_TOKEN"
+      
+      # Pull required images
+      sudo kubeadm config images pull
+      
+      # Init with private ip
+      MASTER_PRIVATE_IP=$(ip addr show ${INTERFACE_NAME} | awk '/inet / {print $2}' | cut -d/ -f1)
+      sudo kubeadm init --apiserver-advertise-address="$MASTER_PRIVATE_IP" --apiserver-cert-extra-sans="$MASTER_PRIVATE_IP" --pod-network-cidr="$POD_CIDR" --node-name "$NODENAME" --ignore-preflight-errors Swap
+      
+      # Configure kubeconfig
+      mkdir -p "$HOME"/.kube
+      sudo cp -i /etc/kubernetes/admin.conf ${KUBE_CFG_DIR}
+      sudo chown "$(id -u)":"$(id -g)" ${KUBE_CFG_DIR}
+      
+      # Install Claico Network Plugin Network 
+      kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/tigera-operator.yaml --kubeconfig=${KUBE_CFG_DIR}
+      curl https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/custom-resources.yaml -O
+      kubectl create -f custom-resources.yaml --kubeconfig=${KUBE_CFG_DIR}
+      
+      sudo kubeadm token create --print-join-command > tkn_cmd
+      
+      aws ssm put-parameter --name ${KUBE_JOIN_TOKEN} --value "$(cat tkn_cmd)" --type String --overwrite --region "eu-central-1"
+      
+      sudo chown ${DEFAULT_USER} ${KUBE_CFG_DIR}
 
   NodeInstanceTypeParam:
     Description: Node instance type
@@ -138,10 +244,10 @@ Resources:
       SubnetId: !Ref FactoryPublicSubnet
       RouteTableId: !Ref FactoryPublicRouteTable
   
-  FactoryKeyPair:
+  KeyPair:
     Type: AWS::EC2::KeyPair
     Properties:
-      KeyName: !Ref FactoryKeyPairNameParam
+      KeyName: "KeyPairNameParam"
 
   FactoryGlobalSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -212,153 +318,228 @@ Resources:
           ToPort: -1
           CidrIp: 0.0.0.0/0
 
-  FactoryMaster:
-    Type: AWS::EC2::Instance
-    DependsOn: FactoryGlobalSecurityGroup
+  MasterNodeLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
     Properties:
-      ImageId: !Ref MasterImageIdParam
-      InstanceType: !Ref MasterInstanceTypeParam
-      SecurityGroupIds:
-        - !Ref FactoryGlobalSecurityGroup
-      KeyName: !Ref FactoryKeyPair
+      LaunchTemplateName: MasterNodeLaunchTemplate
+      VersionDescription: Initial version
+      LaunchTemplateData:
+        UserData:
+          Fn::Base64: !Sub |
+            ${CommonNodeInitScriptParam}
+            ${MasterNodeInitScriptParam}
+        ImageId: ami-0ab1a82de7ca5889c # ubuntu 20.04
+        InstanceType: !Ref MasterInstanceTypeParam
+        KeyName: !Ref KeyPair
+        SecurityGroupIds:
+          - !Ref FactoryGlobalSecurityGroup
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeSize: 30
+              VolumeType: gp2
+              DeleteOnTermination: true
+
+  MasterNode:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - FactoryGlobalSecurityGroup
+      - MasterNodeLaunchTemplate
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref MasterNodeLaunchTemplate
+        Version: 1
       PrivateIpAddress: !Ref MasterPrivateAddressParam
       SubnetId: !Ref FactoryPublicSubnet
+      IamInstanceProfile: !Ref NodeInstanceProfile
 
-  FactoryNode:
-    Type: AWS::EC2::Instance
-    DependsOn: FactoryGlobalSecurityGroup
+  NodeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
     Properties:
-      ImageId: !Ref NodeImageIdParam
-      InstanceType: !Ref NodeInstanceTypeParam
-      SecurityGroupIds:
-        - !Ref FactoryGlobalSecurityGroup
-      KeyName: !Ref FactoryKeyPair
-      PrivateIpAddress: !Ref NodePrivateAddressParam
-      SubnetId: !Ref FactoryPublicSubnet
+      InstanceProfileName: node-ec2-instance-profile
+      Path: /
+      Roles:
+        - !Ref NodeRole
 
-  FactoryCodeBuildPolicy:
-    Type: AWS::IAM::ManagedPolicy
+  NodeRole:
+    Type: "AWS::IAM::Role"
     Properties:
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: VisualEditor0
-            Effect: Allow
-            Action:
-              - s3:ListBucket
-              - s3:GetBucketAcl
-              - s3:PutObject
-              - s3:GetObject
-              - s3:GetBucketLocation
-              - s3:GetObjectVersion
-              - logs:CreateLogGroup
-              - logs:PutLogEvents
-              - logs:CreateLogStream
-              - codebuild:CreateReportGroup
-              - codebuild:CreateReport
-              - codebuild:UpdateReport
-              - codebuild:BatchPutCodeCoverages
-              - codebuild:BatchPutTestCases
-              - codeartifact:GetAuthorizationToken
-              - codeartifact:ReadFromRepository
-              - codeartifact:GetRepositoryEndpoint
-              - codeartifact:PutPackageMetadata
-              - codeartifact:PublishPackageVersion
-            Resource:
-              - arn:aws:codeartifact:eu-central-1:781648067507:repository/factory/FactoryRepository
-              - arn:aws:codeartifact:eu-central-1:781648067507:package/factory/FactoryRepository/*/*/*
-              - arn:aws:codeartifact:eu-central-1:781648067507:domain/factory
-              - arn:aws:s3:::factory-ci-cd-*
-              - arn:aws:s3:::codepipeline-eu-central-1-*
-              - arn:aws:logs:eu-central-1:781648067507:log-group:/aws/codebuild/*
-              - arn:aws:codebuild:eu-central-1:781648067507:report-group/*
-          - Sid: VisualEditor1
-            Effect: Allow
-            Action:
-              - s3:PutObject
-              - s3:GetObject
-              - s3:CreateBucket
-              - s3:List*
-              - sts:GetServiceBearerToken
-              - ec2:CreateNetworkInterface
-              - ec2:DescribeDhcpOptions
-              - ec2:DescribeNetworkInterfaces
-              - ec2:DeleteNetworkInterface
-              - ec2:DescribeSubnets
-              - ec2:DescribeSecurityGroups
-              - ec2:DescribeVpcs
-            Resource: '*'
-          - Sid: VisualEditor2
-            Effect: Allow
-            Action:
-              - ssm:GetParameters
-              - ssm:GetParameter
-            Resource:
-              - arn:aws:ssm:*:781648067507:parameter/FactorySecrets/DOCKER_PASSWORD
-              - arn:aws:ssm:*:781648067507:parameter/FactorySecrets/DOCKER_USERNAME
-
-  FactoryCodeBuildRole:
-    Type: AWS::IAM::Role
-    Properties:
+      RoleName: NodeRole
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
-          - Effect: Allow
+          - Effect: "Allow"
             Principal:
-              Service: codebuild.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - !Ref FactoryCodeBuildPolicy
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: NodePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ssm:GetParameter"
+                  - "ssm:GetParameters"
+                  - "ssm:GetParametersByPath"
+                  - "ssm:PutParameter"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "sns:Publish"
+                  - "sns:Subscribe"
+                Resource: "arn:aws:sns:eu-central-1:781648067507:*"
 
-  Demo1FactoryCodeBuildProject:
-    Type: AWS::CodeBuild::Project
-    Properties:
-      Name: Demo1FactoryBuildProject
-      ServiceRole: !GetAtt FactoryCodeBuildRole.Arn
-      Artifacts:
-        Type: NO_ARTIFACTS
-      Environment:
-        Type: LINUX_CONTAINER
-        PrivilegedMode: true
-        ComputeType: BUILD_GENERAL1_SMALL
-        Image: aws/codebuild/standard:7.0
-        EnvironmentVariables:
-          - Name: DOCKER_USERNAME
-            Type: PARAMETER_STORE
-            Value: /FactorySecrets/DOCKER_USERNAME
-          - Name: DOCKER_PASSWORD
-            Type: PARAMETER_STORE
-            Value: /FactorySecrets/DOCKER_PASSWORD
-      Source:
-        Type: GITHUB
-        Location: https://github.com/MySensorFactory/test.git
-        GitCloneDepth: 1
+#  NodeLaunchTemplate:
+#    Type: AWS::EC2::LaunchTemplate
+#    Properties:
+#      LaunchTemplateName: MasterNodeLaunchTemplate
+#      VersionDescription: Initial version
+#      LaunchTemplateData:
+#        InstanceType: !Ref MasterInstanceTypeParam
+#        KeyName: !Ref FactoryKeyPair
+#        SecurityGroupIds:
+#          - !Ref FactoryGlobalSecurityGroup
+#        UserData:
+#          Fn::Base64: !Ref MasterNodeInitScript
+#
+#  Node:
+#    Type: AWS::EC2::Instance
+#    DependsOn: FactoryGlobalSecurityGroup
+#    Properties:
+#      ImageId: !Ref NodeImageIdParam
+#      InstanceType: !Ref NodeInstanceTypeParam
+#      SecurityGroupIds:
+#        - !Ref FactoryGlobalSecurityGroup
+#      KeyName: !Ref FactoryKeyPair
+#      PrivateIpAddress: !Ref NodePrivateAddressParam
+#      SubnetId: !Ref FactoryPublicSubnet
+
+#  FactoryCodeBuildPolicy:
+#    Type: AWS::IAM::ManagedPolicy
+#    Properties:
+#      PolicyDocument:
+#        Version: '2012-10-17'
+#        Statement:
+#          - Sid: VisualEditor0
+#            Effect: Allow
+#            Action:
+#              - s3:ListBucket
+#              - s3:GetBucketAcl
+#              - s3:PutObject
+#              - s3:GetObject
+#              - s3:GetBucketLocation
+#              - s3:GetObjectVersion
+#              - logs:CreateLogGroup
+#              - logs:PutLogEvents
+#              - logs:CreateLogStream
+#              - codebuild:CreateReportGroup
+#              - codebuild:CreateReport
+#              - codebuild:UpdateReport
+#              - codebuild:BatchPutCodeCoverages
+#              - codebuild:BatchPutTestCases
+#              - codeartifact:GetAuthorizationToken
+#              - codeartifact:ReadFromRepository
+#              - codeartifact:GetRepositoryEndpoint
+#              - codeartifact:PutPackageMetadata
+#              - codeartifact:PublishPackageVersion
+#            Resource:
+#              - arn:aws:codeartifact:eu-central-1:781648067507:repository/factory/FactoryRepository
+#              - arn:aws:codeartifact:eu-central-1:781648067507:package/factory/FactoryRepository/*/*/*
+#              - arn:aws:codeartifact:eu-central-1:781648067507:domain/factory
+#              - arn:aws:s3:::factory-ci-cd-*
+#              - arn:aws:s3:::codepipeline-eu-central-1-*
+#              - arn:aws:logs:eu-central-1:781648067507:log-group:/aws/codebuild/*
+#              - arn:aws:codebuild:eu-central-1:781648067507:report-group/*
+#          - Sid: VisualEditor1
+#            Effect: Allow
+#            Action:
+#              - s3:PutObject
+#              - s3:GetObject
+#              - s3:CreateBucket
+#              - s3:List*
+#              - sts:GetServiceBearerToken
+#              - ec2:CreateNetworkInterface
+#              - ec2:DescribeDhcpOptions
+#              - ec2:DescribeNetworkInterfaces
+#              - ec2:DeleteNetworkInterface
+#              - ec2:DescribeSubnets
+#              - ec2:DescribeSecurityGroups
+#              - ec2:DescribeVpcs
+#            Resource: '*'
+#          - Sid: VisualEditor2
+#            Effect: Allow
+#            Action:
+#              - ssm:GetParameters
+#              - ssm:GetParameter
+#            Resource:
+#              - arn:aws:ssm:*:781648067507:parameter/FactorySecrets/DOCKER_PASSWORD
+#              - arn:aws:ssm:*:781648067507:parameter/FactorySecrets/DOCKER_USERNAME
+#
+#  FactoryCodeBuildRole:
+#    Type: AWS::IAM::Role
+#    Properties:
+#      AssumeRolePolicyDocument:
+#        Version: '2012-10-17'
+#        Statement:
+#          - Effect: Allow
+#            Principal:
+#              Service: codebuild.amazonaws.com
+#            Action: sts:AssumeRole
+#      ManagedPolicyArns:
+#        - !Ref FactoryCodeBuildPolicy
+#
+#  Demo1FactoryCodeBuildProject:
+#    Type: AWS::CodeBuild::Project
+#    Properties:
+#      Name: Demo1FactoryBuildProject
+#      ServiceRole: !GetAtt FactoryCodeBuildRole.Arn
+#      Artifacts:
+#        Type: NO_ARTIFACTS
+#      Environment:
+#        Type: LINUX_CONTAINER
+#        PrivilegedMode: true
+#        ComputeType: BUILD_GENERAL1_SMALL
+#        Image: aws/codebuild/standard:7.0
+#        EnvironmentVariables:
+#          - Name: DOCKER_USERNAME
+#            Type: PARAMETER_STORE
+#            Value: /FactorySecrets/DOCKER_USERNAME
+#          - Name: DOCKER_PASSWORD
+#            Type: PARAMETER_STORE
+#            Value: /FactorySecrets/DOCKER_PASSWORD
+#      Source:
+#        Type: GITHUB
+#        Location: https://github.com/MySensorFactory/test.git
+#        GitCloneDepth: 1
 
 Outputs:
   MasterId:
     Description: Master ID
-    Value: !Ref FactoryMaster
+    Value: "MasterNode"
 
   NodeId:
     Description: Node ID
-    Value: !Ref FactoryNode
+    Value: "Node"
 
   FactorySecurityGroupId:
     Description: Security Group ID of the created Factory Security Group
     Value: !Ref FactoryGlobalSecurityGroup
 
-  FactoryKeyPairNameOutput:
+  KeyPairNameOutput:
     Description: Name of the EC2 Factory Key Pair used for the master and nodes
-    Value: !Ref FactoryKeyPair
+    Value: !Ref KeyPair
 
   FactoryVpcId:
     Description: Factory VPC ID
     Value: !Ref FactoryVPC
 
-  FactoryCodeBuildRoleId:
-    Description: Factory Code Build ID
-    Value: !Ref FactoryCodeBuildRole
-
-  FactoryCodeBuildPolicyId:
-    Description: Factory Code Build ID
-    Value: !Ref FactoryCodeBuildPolicy
+#  FactoryCodeBuildRoleId:
+#    Description: Factory Code Build ID
+#    Value: !Ref FactoryCodeBuildRole
+#
+#  FactoryCodeBuildPolicyId:
+#    Description: Factory Code Build ID
+#    Value: !Ref FactoryCodeBuildPolicy
