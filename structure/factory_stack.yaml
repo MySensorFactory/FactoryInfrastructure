@@ -2,6 +2,21 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudFormation Template to create master and node for Kubernetes cluster
 
 Parameters:
+  S3BucketParam:
+    Type: String
+    Default: factory-ci-cd
+    Description: Factory bucket name
+
+  ZoneIdParam:
+    Description: ID of the availability zone
+    Type: String
+    Default: eu-central-1
+
+  AccountIdParam:
+    Description: ID of the AWS account
+    Type: String
+    Default: 781648067507
+
   MasterImageIdParam:
     Description: ID of the AMI to use for EC2 instances
     Type: String
@@ -140,7 +155,12 @@ Parameters:
       # install python3 tools
       sudo apt install python3-pip -y
       pip3 install awscli
-
+      pip3 install pydantic
+      pip3 install boto3
+      
+      # pull cicd tools
+      aws s3 cp s3://factory-ci-cd/applications/cicd_functions/ ./ --recursive
+  
   MasterNodeInitScriptParam:
     Type: String
     Default: |
@@ -178,6 +198,8 @@ Parameters:
       aws ssm put-parameter --name ${KUBE_JOIN_TOKEN} --value "$(cat tkn_cmd)" --type String --overwrite --region "eu-central-1"
       
       sudo chown ${DEFAULT_USER} ${KUBE_CFG_DIR}
+      
+      python3 send_master_ready_event.py
 
   NodeInstanceTypeParam:
     Description: Node instance type
@@ -345,6 +367,7 @@ Resources:
     DependsOn:
       - FactoryGlobalSecurityGroup
       - MasterNodeLaunchTemplate
+      - CICDSQSQueue
     Properties:
       LaunchTemplate:
         LaunchTemplateId: !Ref MasterNodeLaunchTemplate
@@ -390,7 +413,67 @@ Resources:
                 Action:
                   - "sns:Publish"
                   - "sns:Subscribe"
-                Resource: "arn:aws:sns:eu-central-1:781648067507:*"
+                Resource: !Sub "arn:aws:sns:${ZoneIdParam}:${AccountIdParam}:*"
+              - Effect: "Allow"
+                Action:
+                  - "sqs:ReceiveMessage"
+                  - "sqs:DeleteMessage"
+                Resource: !Sub "arn:aws:sqs:${ZoneIdParam}:${AccountIdParam}:*"
+              - Effect: "Allow"
+                Action:
+                  - s3:List*
+                  - s3:GetObject
+                Resource: "*"
+
+  CICDSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: CICDSNSTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+
+  CICDTopicArnSsmParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: "/CICD/CICDTopicArn"
+      Type: String
+      Value: !Ref CICDSNSTopic
+
+  CICDSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: CICDSQSQueue
+
+  CICDSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt CICDSQSQueue.Arn
+      Protocol: sqs
+      TopicArn: !Ref CICDSNSTopic
+
+  CICDQueueArnSsmParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: "/CICD/CICDQueueUrl"
+      Type: String
+      Value: !Ref CICDSQSQueue
+
+  CICDQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref CICDSQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt CICDSQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref CICDSNSTopic
 
 #  NodeLaunchTemplate:
 #    Type: AWS::EC2::LaunchTemplate
