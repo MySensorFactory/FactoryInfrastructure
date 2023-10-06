@@ -32,7 +32,7 @@ Parameters:
     Type: String
     Default: 172.31.15.100
 
-  NodePrivateAddressParam:
+  SlaveNodePrivateAddressParam:
     Description: Master private ip
     Type: String
     Default: 172.31.5.64
@@ -201,6 +201,19 @@ Parameters:
       
       python3 send_master_ready_event.py
 
+  SlaveNodeInitScriptParam:
+    Type: String
+    Default: |
+      #!/bin/bash
+      
+      KUBE_JOIN_TOKEN="/CICD/KUBE_JOIN_TOKEN"
+      
+      # Wait for master to be ready
+      python3 receive_master_ready_event.py
+      
+      # Join to master
+      aws ssm get-parameter --name ${KUBE_JOIN_TOKEN} --query "Parameter.Value" --output text --region "eu-central-1" | sudo bash
+
   NodeInstanceTypeParam:
     Description: Node instance type
     Type: String
@@ -362,6 +375,28 @@ Resources:
               VolumeType: gp2
               DeleteOnTermination: true
 
+  SlaveNodeLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: SlaveNodeLaunchTemplate
+      VersionDescription: Initial version
+      LaunchTemplateData:
+        UserData:
+          Fn::Base64: !Sub |
+            ${CommonNodeInitScriptParam}
+            ${SlaveNodeInitScriptParam}
+        ImageId: ami-0ab1a82de7ca5889c # ubuntu 20.04
+        InstanceType: !Ref MasterInstanceTypeParam
+        KeyName: !Ref KeyPair
+        SecurityGroupIds:
+          - !Ref FactoryGlobalSecurityGroup
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeSize: 30
+              VolumeType: gp2
+              DeleteOnTermination: true
+
   MasterNode:
     Type: AWS::EC2::Instance
     DependsOn:
@@ -373,6 +408,20 @@ Resources:
         LaunchTemplateId: !Ref MasterNodeLaunchTemplate
         Version: 1
       PrivateIpAddress: !Ref MasterPrivateAddressParam
+      SubnetId: !Ref FactoryPublicSubnet
+      IamInstanceProfile: !Ref NodeInstanceProfile
+
+  SlaveNode:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - FactoryGlobalSecurityGroup
+      - SlaveNodeLaunchTemplate
+      - CICDSQSQueue
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref SlaveNodeLaunchTemplate
+        Version: 1
+      PrivateIpAddress: !Ref SlaveNodePrivateAddressParam
       SubnetId: !Ref FactoryPublicSubnet
       IamInstanceProfile: !Ref NodeInstanceProfile
 
