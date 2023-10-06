@@ -21,10 +21,10 @@ def is_message_not_parsable(sqs_response: dict) -> bool:
     return False
 
 
-def get_cicd_event(sqs_response: dict) -> EventMessage:
+def get_cicd_event(sqs_response: dict) -> [EventMessage, str]:
     messages_body = sqs_response['Messages'][0]['Body']
     message_body = json.loads(messages_body)
-    return EventMessage(**json.loads(message_body['Message']))
+    return EventMessage(**json.loads(message_body['Message'])), sqs_response['Messages'][0]['ReceiptHandle']
 
 
 class SnsClient:
@@ -59,17 +59,24 @@ class SqsClient:
             WaitTimeSeconds=self.timeout
         )
 
-    def wait_for_event(self, event_name: str)-> None:
+    def delete_message(self, receipt_handle: str) -> None:
+        self.client.delete_message(
+            QueueUrl=self.queue_url,
+            ReceiptHandle=receipt_handle
+        )
+
+    def wait_for_event(self, event_name: str) -> None:
         while True:
             response = self.poll_message()
 
             if is_message_not_parsable(response):
                 continue
 
-            event = get_cicd_event(response)
+            event, receipt_handle = get_cicd_event(response)
 
             if event.event_type == event_name:
                 print(f"Received: {event_name}")
+                self.delete_message(receipt_handle)
                 break
 
 
