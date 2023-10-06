@@ -5,7 +5,9 @@ env:
         PROJECT_NAME: infrastructure
         BUCKET_NAME: factory-ci-cd
         S3_LAMBDAS_DESTINATION: applications/lambda
+        S3_CICD_FUNCTIONS_DESTINATION: applications/cicd_functions
         LAMBDAS_SOURCE_FOLDER: lambda_functions
+        CICD_FUNCTIONS_SOURCE_FOLDER: structure/functions
 
 phases: 
     install:
@@ -21,6 +23,8 @@ phases:
             - echo "Building infrastructure ..."
             - echo "Uploading lambdas ..."
             - python3 update_lambdas.py
+            - echo "Uploading cicd tools ..."
+            - python3 update_cicd_functions.py
     post_build:
         commands:
             - echo "Post build commands  ..."
