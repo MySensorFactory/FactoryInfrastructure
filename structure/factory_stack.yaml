@@ -162,7 +162,7 @@ Parameters:
       pip3 install boto3
       
       # pull cicd tools
-      aws s3 cp s3://factory-ci-cd/applications/cicd_functions/ ./ --recursive
+      aws s3 cp s3://factory-ci-cd/applications/cicd/ ./ --recursive
   
   MasterNodeInitScriptParam:
     Type: String
