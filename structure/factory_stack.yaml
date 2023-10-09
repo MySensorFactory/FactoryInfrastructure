@@ -172,12 +172,13 @@ Parameters:
       set -euxo pipefail
       
       NODENAME=$(hostname -s)
-      POD_CIDR="192.168.0.0/16"
+      POD_CIDR="10.244.0.0/16" # must be 10.244.0.0 bcs it's hardcoded in flannel .yml
       INTERFACE_NAME=ens5
       HOME=/home/ubuntu
       KUBE_CFG_DIR="$HOME"/.kube/config
       DEFAULT_USER=ubuntu
       KUBE_JOIN_TOKEN="/CICD/KUBE_JOIN_TOKEN"
+      REGION="eu-central-1"
       
       # Pull required images
       sudo kubeadm config images pull
@@ -196,6 +197,10 @@ Parameters:
       curl https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/custom-resources.yaml -O
       kubectl create -f custom-resources.yaml --kubeconfig=${KUBE_CFG_DIR}
       
+      # Install Plugin Network 
+      sudo kubectl apply -f kube/cni.yml --kubeconfig=${KUBE_CFG_DIR}
+      
+      # Send join command to parameter store
       sudo kubeadm token create --print-join-command > tkn_cmd
       
       aws ssm put-parameter --name ${KUBE_JOIN_TOKEN} --value "$(cat tkn_cmd)" --type String --overwrite --region "eu-central-1"
