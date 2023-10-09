@@ -118,23 +118,26 @@ Parameters:
 
       sudo sysctl --system
 
-      cat <<EOF | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
-      deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/ /
+      # Install container runtime
+      sudo apt-get update -y
+      sudo apt install docker.io -y
+      systemctl start docker
+      
+      cat <<EOF | sudo tee /etc/docker/daemon.json
+      {
+        "exec-opts": ["native.cgroupdriver=systemd"],
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "100m"
+        },
+        "storage-driver": "overlay2"
+      }
       EOF
-      cat <<EOF | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$VERSION.list
-      deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$VERSION/$OS/ /
-      EOF
-
-      curl -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$VERSION/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers.gpg add -
-      curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers.gpg add -
-
-      sudo apt-get update
-      sudo apt-get install cri-o cri-o-runc -y
-
-      sudo systemctl daemon-reload
-      sudo systemctl enable crio --now
-
-      echo "CRI runtime installed susccessfully"
+      
+      systemctl daemon-reload
+      systemctl enable docker
+      systemctl restart docker
+      systemctl status docker
 
       # Install kubelet, kubectl and Kubeadm
       sudo apt-get update -y
