@@ -204,22 +204,31 @@ Parameters:
       
       # Send join command to parameter store
       sudo kubeadm token create --print-join-command > tkn_cmd
+      aws ssm put-parameter --name ${KUBE_JOIN_TOKEN} --value "$(cat tkn_cmd)" --type String --overwrite --region ${REGION}
       
-      aws ssm put-parameter --name ${KUBE_JOIN_TOKEN} --value "$(cat tkn_cmd)" --type String --overwrite --region "eu-central-1"
-      
+      # Release kube config dir
       sudo chown ${DEFAULT_USER} ${KUBE_CFG_DIR}
       
-      python3 send_master_ready_event.py
+      # Others
+      echo "alias k='kubectl'" >> /home/ubuntu/.bashrc
+      
+      python3 functions/send_master_ready_event.py
+
+  DatabaseVolumeId:
+    Description: Id of database volume
+    Type: String
+    Default: vol-0fa4439db2193b41a
 
   SlaveNodeInitScriptParam:
     Type: String
     Default: |
       #!/bin/bash
+      set -euxo pipefail
       
       KUBE_JOIN_TOKEN="/CICD/KUBE_JOIN_TOKEN"
       
       # Wait for master to be ready
-      python3 receive_master_ready_event.py
+      python3 functions/receive_master_ready_event.py
       
       # Join to master
       aws ssm get-parameter --name ${KUBE_JOIN_TOKEN} --query "Parameter.Value" --output text --region "eu-central-1" | sudo bash
@@ -435,6 +444,13 @@ Resources:
       SubnetId: !Ref FactoryPublicSubnet
       IamInstanceProfile: !Ref NodeInstanceProfile
 
+  VolumeAttachment:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      InstanceId: !Ref SlaveNode
+      VolumeId: !Ref DatabaseVolumeId
+      Device: /dev/sdf
+
   NodeInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
@@ -480,8 +496,26 @@ Resources:
                 Resource: !Sub "arn:aws:sqs:${ZoneIdParam}:${AccountIdParam}:*"
               - Effect: "Allow"
                 Action:
-                  - s3:List*
-                  - s3:GetObject
+                  - "s3:List*"
+                  - "s3:GetObject"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "ec2:AttachVolume"
+                  - "ec2:CreateSnapshot"
+                  - "ec2:CreateTags"
+                  - "ec2:CreateVolume"
+                  - "ec2:DeleteSnapshot"
+                  - "ec2:DeleteTags"
+                  - "ec2:DeleteVolume"
+                  - "ec2:DescribeAvailabilityZones"
+                  - "ec2:DescribeInstances"
+                  - "ec2:DescribeSnapshots"
+                  - "ec2:DescribeTags"
+                  - "ec2:DescribeVolumes"
+                  - "ec2:DescribeVolumesModifications"
+                  - "ec2:DetachVolume"
+                  - "ec2:ModifyVolume"
                 Resource: "*"
 
   CICDSNSTopic:
