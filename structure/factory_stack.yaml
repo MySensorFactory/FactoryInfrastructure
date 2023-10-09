@@ -233,6 +233,19 @@ Parameters:
       # Join to master
       aws ssm get-parameter --name ${KUBE_JOIN_TOKEN} --query "Parameter.Value" --output text --region "eu-central-1" | sudo bash
 
+  DatabaseSlaveNodeInitScriptParam:
+    Type: String
+    Default: |
+      #!/bin/bash
+      # Invoke it after attaching gp2 to an instance
+      
+      DEVICE_NAME=nvme1n1
+      
+      # mount it
+      mkdir /database
+      sudo mount /dev/${DEVICE_NAME} /database
+      sudo chmod 777 /database
+
   NodeInstanceTypeParam:
     Description: Node instance type
     Type: String
@@ -404,6 +417,7 @@ Resources:
           Fn::Base64: !Sub |
             ${CommonNodeInitScriptParam}
             ${SlaveNodeInitScriptParam}
+            ${DatabaseSlaveNodeInitScriptParam}
         ImageId: ami-0ab1a82de7ca5889c # ubuntu 20.04
         InstanceType: !Ref MasterInstanceTypeParam
         KeyName: !Ref KeyPair
