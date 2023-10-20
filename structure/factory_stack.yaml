@@ -160,6 +160,7 @@ Parameters:
       pip3 install awscli
       pip3 install pydantic
       pip3 install boto3
+      pip3 install kubernetes
       
       # pull cicd tools
       aws s3 cp s3://factory-ci-cd/applications/cicd/ ./ --recursive
@@ -179,6 +180,7 @@ Parameters:
       DEFAULT_USER=ubuntu
       KUBE_JOIN_TOKEN="/CICD/KUBE_JOIN_TOKEN"
       REGION="eu-central-1"
+      NAMESPACE=factory
       
       # Pull required images
       sudo kubeadm config images pull
@@ -202,6 +204,9 @@ Parameters:
       # Install Plugin Network 
       sudo kubectl apply -f kube/cni.yml --kubeconfig=${KUBE_CFG_DIR}
       
+      # Create namespace for applications
+      kubectl create namespace ${NAMESPACE} --kubeconfig=${KUBE_CFG_DIR}
+      
       # Send join command to parameter store
       sudo kubeadm token create --print-join-command > tkn_cmd
       aws ssm put-parameter --name ${KUBE_JOIN_TOKEN} --value "$(cat tkn_cmd)" --type String --overwrite --region ${REGION}
@@ -211,6 +216,8 @@ Parameters:
       
       # Others
       echo "alias k='kubectl'" >> /home/ubuntu/.bashrc
+      sudo apt install net-tools -y
+      sudo apt install postgresql-client -y
       
       python3 functions/send_master_ready_event.py
 
@@ -332,8 +339,20 @@ Resources:
           ToPort: 10251
           CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
+          FromPort: 10257
+          ToPort: 10257
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 10259
+          ToPort: 10259
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
           FromPort: 2379
           ToPort: 2379
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 2380
+          ToPort: 2380
           CidrIp: 0.0.0.0/0
         #        - IpProtocol: tcp
         #          FromPort: 5555
@@ -355,6 +374,14 @@ Resources:
           FromPort: 6443
           ToPort: 6443
           CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: 8285
+          ToPort: 8285
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: 8472
+          ToPort: 8472
+          CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
           FromPort: 10252
           ToPort: 10252
@@ -368,7 +395,7 @@ Resources:
           ToPort: 22
           CidrIp: 0.0.0.0/0
         - IpProtocol: icmp
-          FromPort: 0
+          FromPort: -1
           ToPort: -1
           CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
@@ -537,7 +564,6 @@ Resources:
     Properties:
       DisplayName: CICDSNSTopic
       FifoTopic: true
-      ContentBasedDeduplication: true
 
   CICDTopicArnSsmParameter:
     Type: AWS::SSM::Parameter
