@@ -35,7 +35,8 @@ class SnsClient:
         response = self.client.publish(
             TopicArn=topic_arn,
             Message=message.json(),
-            MessageGroupId=str(uuid.uuid4())
+            MessageGroupId=str(uuid.uuid4()),
+            MessageDeduplicationId=str(uuid.uuid4())
         )
         return response
 
