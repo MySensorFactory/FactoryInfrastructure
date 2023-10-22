@@ -16,6 +16,7 @@ phases:
         commands:
             - apt update -y
             - pip install twine
+            - pip install build
     pre_build:
         commands:
             - echo "Pre build commands ..."
@@ -26,7 +27,7 @@ phases:
             - echo "Uploading structure files ..."
             - python3 update_structure_files.py
             - echo Updating common packages
-            - python3 ./structure/libraries/cicd_tools/setup.py sdist
+            - python3 -m build ./structure/libraries/cicd_tools/
             - twine upload --repository codeartifact dist/cicd_tools-1.0.0.tar.gz
     post_build:
         commands:

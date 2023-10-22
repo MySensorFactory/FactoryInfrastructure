@@ -56,20 +56,19 @@ class S3Client:
             local_file_path = os.path.join(local_folder, os.path.basename(file_name))
             self.download_file(file_name, local_file_path)
 
-
 class SnsClient:
-    def __init__(self, region):
+    def __init__(self, region, topic_arn: str):
         self.client = boto3.client('sns', region_name=region)
+        self.topic_arn = topic_arn
 
-    def publish(self, message: EventMessage, topic_arn: str):
+    def publish(self, message: EventMessage):
         response = self.client.publish(
-            TopicArn=topic_arn,
+            TopicArn=self.topic_arn,
             Message=message.json(),
             MessageGroupId=str(uuid.uuid4()),
             MessageDeduplicationId=str(uuid.uuid4())
         )
         return response
-
 
 class SqsClient:
     def __init__(self, region: str, queue_url: str, timeout: int):
