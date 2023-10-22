@@ -5,9 +5,9 @@ env:
         PROJECT_NAME: infrastructure
         BUCKET_NAME: factory-ci-cd
         S3_LAMBDAS_DESTINATION: applications/lambda
-        S3_CICD_FUNCTIONS_DESTINATION: applications/cicd_functions
         LAMBDAS_SOURCE_FOLDER: lambda_functions
-        CICD_FUNCTIONS_SOURCE_FOLDER: structure/functions
+        CICD_FUNCTIONS_SOURCE_DIR: structure/functions
+        S3_CICD_FUNCTIONS_DESTINATION: applications/cicd_functions
 
 phases: 
     install:
@@ -15,16 +15,19 @@ phases:
             python: 3.11
         commands:
             - apt update -y
+            - pip install twine
     pre_build:
         commands:
             - echo "Pre build commands ..."
+            - aws codeartifact login --tool twine --domain factory --domain-owner 781648067507 --repository FactoryRepository --region eu-central-1
     build:
         commands:
             - echo "Building infrastructure ..."
-            - echo "Uploading lambdas ..."
-            - python3 update_lambdas.py
-            - echo "Uploading cicd tools ..."
-            - python3 update_cicd_functions.py
+            - echo "Uploading structure files ..."
+            - python3 update_structure_files.py
+            - echo Updating common packages
+            - python3 .\structure\libraries\cicd_tools\setup.py sdist
+            - twine upload --repository FactoryRepository dist/cicd_tools-1.0.0.tar.gz
     post_build:
         commands:
             - echo "Post build commands  ..."
