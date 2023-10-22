@@ -8,6 +8,7 @@ env:
         LAMBDAS_SOURCE_FOLDER: lambda_functions
         CICD_FUNCTIONS_SOURCE_DIR: structure/functions
         S3_CICD_FUNCTIONS_DESTINATION: applications/cicd/functions
+        CICD_TOOLS_VERSION: 1.0.1
 
 phases: 
     install:
@@ -28,7 +29,7 @@ phases:
             - python3 update_structure_files.py
             - echo Updating common packages
             - python3 -m build ./structure/libraries/cicd_tools/ --outdir .
-            - twine upload --repository codeartifact cicd_tools-1.0.0.tar.gz
+            - twine upload --repository codeartifact cicd_tools-${CICD_TOOLS_VERSION}.tar.gz
     post_build:
         commands:
             - echo "Post build commands  ..."
