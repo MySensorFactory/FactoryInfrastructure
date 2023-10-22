@@ -27,9 +27,6 @@ phases:
             - echo "Building infrastructure ..."
             - echo "Uploading structure files ..."
             - python3 update_structure_files.py
-            - echo Updating common packages
-            - python3 -m build ./structure/libraries/cicd_tools/ --outdir .
-            - twine upload --repository codeartifact cicd_tools-${CICD_TOOLS_VERSION}.tar.gz
     post_build:
         commands:
             - echo "Post build commands  ..."
