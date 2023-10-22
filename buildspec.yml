@@ -27,7 +27,7 @@ phases:
             - python3 update_structure_files.py
             - echo Updating common packages
             - python3 ./structure/libraries/cicd_tools/setup.py sdist
-            - twine upload --repository FactoryRepository dist/cicd_tools-1.0.0.tar.gz
+            - twine upload --repository codeartifact dist/cicd_tools-1.0.0.tar.gz
     post_build:
         commands:
             - echo "Post build commands  ..."
