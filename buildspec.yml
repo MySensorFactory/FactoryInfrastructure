@@ -7,7 +7,7 @@ env:
         S3_LAMBDAS_DESTINATION: applications/lambda
         LAMBDAS_SOURCE_FOLDER: lambda_functions
         CICD_FUNCTIONS_SOURCE_DIR: structure/functions
-        S3_CICD_FUNCTIONS_DESTINATION: applications/cicd_functions
+        S3_CICD_FUNCTIONS_DESTINATION: applications/cicd/functions
 
 phases: 
     install:
@@ -26,7 +26,7 @@ phases:
             - echo "Uploading structure files ..."
             - python3 update_structure_files.py
             - echo Updating common packages
-            - python3 .\structure\libraries\cicd_tools\setup.py sdist
+            - python3 /structure/libraries/cicd_tools/setup.py sdist
             - twine upload --repository FactoryRepository dist/cicd_tools-1.0.0.tar.gz
     post_build:
         commands:
