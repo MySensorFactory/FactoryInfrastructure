@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='cicd_tools',
-    version='1.0.0',
+    version='1.0.1',
     description='Cicd tools python package',
     author='Damian Wojcik',
     license='BSD 2-clause',
