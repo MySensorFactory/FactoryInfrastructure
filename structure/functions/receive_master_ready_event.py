@@ -1,4 +1,4 @@
-from cicd_tools import is_message_not_parsable, get_cicd_event, ParameterStoreClient, SqsClient
+from cicd_tools import ParameterStoreClient, SqsClient
 
 REGION = 'eu-central-1'
 ACCOUNT_ID = '781648067507'
