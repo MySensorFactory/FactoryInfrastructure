@@ -29,6 +29,8 @@ phases:
             - python3 update_structure_files.py
             - echo "Updating lambdas"
             - python3 update_lambda_deployments.py
+            - echo "Updating step functions"
+            - python3 update_step_functions.py
     post_build:
         commands:
             - echo "Post build commands  ..."
