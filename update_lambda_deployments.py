@@ -37,7 +37,7 @@ def update_lambdas():
         )
 
 def update_layers():
-    for zip_file, layer_name in layers:
+    for zip_file, layer_name in layers.items():
         s3_client.download_file(BUCKET_NAME, s3_folder + zip_file, zip_file)
         with open(zip_file, 'rb') as layer_file:
             lambda_client.publish_layer_version(
