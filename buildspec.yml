@@ -16,12 +16,9 @@ phases:
             python: 3.11
         commands:
             - apt update -y
-            - pip install twine
-            - pip install build
     pre_build:
         commands:
             - echo "Pre build commands ..."
-            - aws codeartifact login --tool twine --domain factory --domain-owner 781648067507 --repository FactoryRepository --region eu-central-1
     build:
         commands:
             - echo "Building infrastructure ..."
