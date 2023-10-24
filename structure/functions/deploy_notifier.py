@@ -1,10 +1,10 @@
 from cicd_tools import ParameterStoreClient, SnsClient, DeploymentMessage, Deployment
 import os
 
-conf_dir = os.environ['S3_DEPLOY_CONFIG_DIR']
 
 def main():
     CICD_PARAMETER_TOPIC_PARAM = "/CICD/CICDTopicArn"
+    CONFIG_DIR = os.environ['S3_DEPLOY_CONFIG_DIR']
     REGION = 'eu-central-1'
 
     parameter_store_client = ParameterStoreClient(REGION)
@@ -16,7 +16,7 @@ def main():
     )
 
     message_data = DeploymentMessage(event_type="Deploy",
-                                     value=Deployment(config_dir=conf_dir))
+                                     value=Deployment(config_dir=CONFIG_DIR))
 
     response = sns_client.publish(message=message_data)
 
