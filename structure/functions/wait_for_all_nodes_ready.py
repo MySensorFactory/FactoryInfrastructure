@@ -3,7 +3,7 @@ from typing import List
 
 from kubernetes import client, config
 
-config.load_kube_config()
+config.load_kube_config('/home/ubuntu/.kube/config')
 k8s_client = client.CoreV1Api()
 
 
