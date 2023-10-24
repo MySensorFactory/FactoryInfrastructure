@@ -1110,12 +1110,6 @@ Resources:
           - Sid: VisualEditor0
             Effect: Allow
             Action:
-              - s3:ListBucket
-              - s3:GetBucketAcl
-              - s3:PutObject
-              - s3:GetObject
-              - s3:GetBucketLocation
-              - s3:GetObjectVersion
               - logs:CreateLogGroup
               - logs:PutLogEvents
               - logs:CreateLogStream
@@ -1133,17 +1127,20 @@ Resources:
               - !Sub arn:aws:codeartifact:${ZoneIdParam}:${AccountIdParam}:repository/factory/FactoryRepository
               - !Sub arn:aws:codeartifact:${ZoneIdParam}:${AccountIdParam}:package/factory/FactoryRepository/*/*/*
               - !Sub arn:aws:codeartifact:${ZoneIdParam}:${AccountIdParam}:domain/factory
-              - arn:aws:s3:::factory-ci-cd-*
-              - arn:aws:s3:::codepipeline-eu-central-1-*
               - !Sub arn:aws:logs:${ZoneIdParam}:${AccountIdParam}:log-group:/aws/codebuild/*
               - !Sub arn:aws:codebuild:${ZoneIdParam}:${AccountIdParam}:report-group/*
           - Sid: VisualEditor1
             Effect: Allow
             Action:
+              - s3:ListBucket
+              - s3:GetBucketAcl
               - s3:PutObject
               - s3:GetObject
-              - s3:CreateBucket
+              - s3:DeleteObject
+              - s3:GetBucketLocation
               - s3:List*
+              - s3:CreateBucket
+              - s3:GetObjectVersion
               - sts:GetServiceBearerToken
               - ec2:CreateNetworkInterface
               - ec2:DescribeDhcpOptions
@@ -1157,6 +1154,18 @@ Resources:
               - states:UpdateStateMachine
               - states:PublishStateMachineVersion
             Resource: '*'
+          - Effect: "Allow"
+            Action:
+              - sns:Publish
+              - sns:Subscribe
+            Resource: !Sub arn:aws:sns:${ZoneIdParam}:${AccountIdParam}:*
+          - Effect: "Allow"
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:GetParametersByPath
+              - ssm:PutParameter
+            Resource: "*"
 
   CodeBuildRole:
     Type: AWS::IAM::Role
@@ -1199,6 +1208,30 @@ Resources:
       Source:
         Type: GITHUB
         Location: https://github.com/MySensorFactory/FactoryInfrastructure.git
+        GitCloneDepth: 1
+
+  DatabaseCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: DatabaseCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: database
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/database
         GitCloneDepth: 1
 
 Outputs:
