@@ -1,7 +1,7 @@
 from cicd_tools import ParameterStoreClient, SnsClient, DeploymentMessage, Deployment
 import os
 
-conf_dir = os.environ['DEPLOY_CONFIG_DIR']
+conf_dir = os.environ['S3_DEPLOY_CONFIG_DIR']
 
 def main():
     CICD_PARAMETER_TOPIC_PARAM = "/CICD/CICDTopicArn"
