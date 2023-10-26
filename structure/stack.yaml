@@ -1234,6 +1234,30 @@ Resources:
         Location: https://github.com/MySensorFactory/database
         GitCloneDepth: 1
 
+  KafkaCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: KafkaCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: database
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/kafka
+        GitCloneDepth: 1
+
 Outputs:
   MasterId:
     Description: Master ID
