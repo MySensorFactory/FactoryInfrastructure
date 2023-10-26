@@ -1252,7 +1252,7 @@ Resources:
             Value: factory-ci-cd
           - Name: PROJECT_NAME
             Type: PLAINTEXT
-            Value: database
+            Value: kafka
       Source:
         Type: GITHUB
         Location: https://github.com/MySensorFactory/kafka
