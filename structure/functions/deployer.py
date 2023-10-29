@@ -26,24 +26,21 @@ def deploy_loop(current_dir: str,
                 sqs_client: Any,
                 yaml_loader: YamlLoader) -> None:
     while True:
-        try:
-            event = sqs_client.wait_for_event('Deploy')
-            print('Got deploy event')
+        event = sqs_client.wait_for_event('Deploy')
+        print('Got deploy event')
 
-            s3_dir = event.value.config_dir
+        s3_dir = event.value.config_dir
 
-            print('Downloading ...')
-            s3client.download_files_from_dir(
-                s3_folder_path=s3_dir,
-                local_folder=current_dir
-            )
+        print('Downloading ...')
+        s3client.download_files_from_dir(
+            s3_folder_path=s3_dir,
+            local_folder=current_dir
+        )
 
-            print('Deploying ...')
-            deploy_config = yaml_loader.parse_yaml('config.yml', DeployConfig)
-            deploy(k8s_manager, deploy_config)
-            rm_deploy_files(current_dir, deploy_config)
-        except Exception:
-            pass
+        print('Deploying ...')
+        deploy_config = yaml_loader.parse_yaml('config.yml', DeployConfig)
+        deploy(k8s_manager, deploy_config)
+        rm_deploy_files(current_dir, deploy_config)
 
 
 def main() -> None:
