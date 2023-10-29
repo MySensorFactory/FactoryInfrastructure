@@ -220,8 +220,8 @@ class KubernetesManager:
         self.core_v1_api.delete_namespaced_service(name, namespace, body=client.V1DeleteOptions())
 
     def is_deployment_ready(self, obj: Any, manifest_data: Dict) -> bool:
-        print(f'Current deployment status: {obj.status.phase}')
-        return obj.status.phase == 'Ready'
+        print(f'Current number of replicas: {obj.status.ready_replicas}')
+        return obj.status.ready_replicas == manifest_data['spec']['replicas']
 
     def is_stateful_set_ready(self, obj: Any, manifest_data: Dict) -> bool:
         print(f'Current number of replicas: {obj.status.available_replicas}')

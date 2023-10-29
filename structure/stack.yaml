@@ -1027,6 +1027,8 @@ Resources:
                 Action:
                   - sqs:ReceiveMessage
                   - sqs:DeleteMessage
+                  - sqs:GetQueueUrl
+                  - sqs:GetQueueAttributes
                 Resource: !Sub arn:aws:sqs:${ZoneIdParam}:${AccountIdParam}:*
               - Effect: "Allow"
                 Action:
@@ -1256,6 +1258,258 @@ Resources:
       Source:
         Type: GITHUB
         Location: https://github.com/MySensorFactory/kafka
+        GitCloneDepth: 1
+
+  SqsKafkaForwarderCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: SqsKafkaForwarderCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: sqs-kafka-forwarder
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/sqs-kafka-forwarder
+        GitCloneDepth: 1
+
+  FrontServiceCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: FrontServiceCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: front-service
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/front-service
+        GitCloneDepth: 1
+
+  ApiStoreCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: ApiStoreCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: api-store
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/api-store
+        GitCloneDepth: 1
+
+  KafkaDbForwarderCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: KafkaDbForwarderCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: kafka-db-forwarder
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/kafka-db-forwarder
+        GitCloneDepth: 1
+
+  EntityStoreCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: EntityStoreCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: entity-store
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/entity-store
+        GitCloneDepth: 1
+
+  DataServiceCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: DataServiceCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: data-service
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/data-service
+        GitCloneDepth: 1
+
+  FactoryParentCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: FactoryParentCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: factory-parent
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/factory-parent
+        GitCloneDepth: 1
+
+  UsersServiceCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: UsersServiceCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: users-service
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/users-service
+        GitCloneDepth: 1
+
+  KafkaDataProcessorCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: KafkaDataProcessorCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: kafka-data-processor
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/api-store
         GitCloneDepth: 1
 
 Outputs:
