@@ -1285,6 +1285,9 @@ Resources:
           - Name: DOCKER_PASSWORD
             Type: PARAMETER_STORE
             Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
       Source:
         Type: GITHUB
         Location: https://github.com/MySensorFactory/sqs-kafka-forwarder
@@ -1315,6 +1318,9 @@ Resources:
           - Name: DOCKER_PASSWORD
             Type: PARAMETER_STORE
             Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
       Source:
         Type: GITHUB
         Location: https://github.com/MySensorFactory/front-service
@@ -1339,6 +1345,9 @@ Resources:
           - Name: PROJECT_NAME
             Type: PLAINTEXT
             Value: api-store
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
       Source:
         Type: GITHUB
         Location: https://github.com/MySensorFactory/api-store
@@ -1369,6 +1378,9 @@ Resources:
           - Name: DOCKER_PASSWORD
             Type: PARAMETER_STORE
             Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
       Source:
         Type: GITHUB
         Location: https://github.com/MySensorFactory/kafka-db-forwarder
@@ -1423,6 +1435,9 @@ Resources:
           - Name: DOCKER_PASSWORD
             Type: PARAMETER_STORE
             Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
       Source:
         Type: GITHUB
         Location: https://github.com/MySensorFactory/data-service
@@ -1477,6 +1492,9 @@ Resources:
           - Name: DOCKER_PASSWORD
             Type: PARAMETER_STORE
             Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
       Source:
         Type: GITHUB
         Location: https://github.com/MySensorFactory/users-service
@@ -1507,9 +1525,12 @@ Resources:
           - Name: DOCKER_PASSWORD
             Type: PARAMETER_STORE
             Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
       Source:
         Type: GITHUB
-        Location: https://github.com/MySensorFactory/api-store
+        Location: https://github.com/MySensorFactory/kafka-data-processor
         GitCloneDepth: 1
 
 Outputs:
