@@ -8,6 +8,7 @@ import boto3
 import yaml
 from kubernetes import client, config
 from kubernetes import utils
+from kubernetes.client import V1Job
 from kubernetes.client.rest import ApiException
 from pydantic import BaseModel
 
@@ -56,6 +57,7 @@ class S3Client:
             local_file_path = os.path.join(local_folder, os.path.basename(file_name))
             self.download_file(file_name, local_file_path)
 
+
 class SnsClient:
     def __init__(self, region, topic_arn: str):
         self.client = boto3.client('sns', region_name=region)
@@ -69,6 +71,7 @@ class SnsClient:
             MessageDeduplicationId=str(uuid.uuid4())
         )
         return response
+
 
 class SqsClient:
     def __init__(self, region: str, queue_url: str, timeout: int):
@@ -161,6 +164,7 @@ class KubernetesManager:
         self.apps_v1_api = client.AppsV1Api()
         self.api_client = client.ApiClient()
         self.networking_v1_api = client.NetworkingV1Api()
+        self.batch_v1_api = client.BatchV1Api()
         self.yaml_loader = YamlLoader()
 
     def read_deployment(self, name: str, namespace: str):
@@ -195,6 +199,10 @@ class KubernetesManager:
         obj = self.core_v1_api.read_namespaced_service(name, namespace)
         return obj, True
 
+    def read_job(self, name: str, namespace: str):
+        obj = self.batch_v1_api.read_namespaced_job_status(name=name, namespace=namespace)
+        return obj, False
+
     def delete_deployment(self, name: str, namespace: str):
         self.apps_v1_api.delete_namespaced_deployment(name, namespace, body=client.V1DeleteOptions())
 
@@ -214,9 +222,12 @@ class KubernetesManager:
         self.core_v1_api.delete_namespaced_secret(name, namespace, body=client.V1DeleteOptions())
 
     def delete_ingress(self, name: str, namespace: str):
-        self.networking_v1_api.delete_namespaced_ingress(name, namespace, body=client.V1DeleteOptions())
+        self.batch_v1_api.delete_namespaced_job(name, namespace, body=client.V1DeleteOptions())
 
     def delete_service(self, name: str, namespace: str):
+        self.core_v1_api.delete_namespaced_service(name, namespace, body=client.V1DeleteOptions())
+
+    def delete_job(self, name: str, namespace: str):
         self.core_v1_api.delete_namespaced_service(name, namespace, body=client.V1DeleteOptions())
 
     def is_deployment_ready(self, obj: Any, manifest_data: Dict) -> bool:
@@ -226,6 +237,11 @@ class KubernetesManager:
     def is_stateful_set_ready(self, obj: Any, manifest_data: Dict) -> bool:
         print(f'Current number of replicas: {obj.status.available_replicas}')
         return obj.status.available_replicas == manifest_data['spec']['replicas']
+
+    def is_job_finished(self, obj: V1Job, manifest_data: Dict) -> bool:
+        succeeded_jobs_count: int = obj.status.succeeded
+        print(f'Current number of succeeded: {succeeded_jobs_count}')
+        return succeeded_jobs_count == 1
 
     ready_conditions = {
         'Deployment': is_deployment_ready,
@@ -240,7 +256,8 @@ class KubernetesManager:
         'ConfigMap': read_config_map,
         'Secret': read_service,
         'Ingress': read_ingress,
-        'Service': read_service
+        'Service': read_service,
+        'Job': read_job
     }
 
     delete_functions = {
@@ -251,7 +268,8 @@ class KubernetesManager:
         'ConfigMap': delete_config_map,
         'Secret': delete_service,
         'Ingress': delete_ingress,
-        'Service': delete_service
+        'Service': delete_service,
+        'Job': delete_job
     }
 
     def is_manifest_exist(self, kind: str, name: str, namespace='default') -> bool:
