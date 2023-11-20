@@ -11,4 +11,4 @@ sqs_queue_url = parameter_store_client.get_parameter(CICD_PARAMETER_QUEUE_URL_PA
 
 sqs_client = SqsClient(REGION, sqs_queue_url, TIMEOUT_SECONDS)
 
-sqs_client.wait_for_event('MasterReady')
+sqs_client.wait_for_event('MasterReady', should_be_deleted=False)

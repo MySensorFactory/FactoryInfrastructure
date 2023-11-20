@@ -18,7 +18,7 @@ def get_ready_nodes_count() -> int:
     return ready_count
 
 
-required_ready_nodes = 2
+required_ready_nodes = 3
 
 
 def wait_for_all_nodes_ready() -> None:

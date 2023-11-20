@@ -46,13 +46,14 @@ class S3Client:
     def download_file(self, s3_file_key: str, destination_file_path: str) -> None:
         try:
             self.client.download_file(self.bucket_name, s3_file_key, destination_file_path)
-            print(f"File {destination_file_path} has been downloaded.")
+            print(f"File {destination_file_path} has been downloaded from {s3_file_key}")
         except Exception as e:
             print(f"Cannot download file {destination_file_path + s3_file_key} from S3: {str(e)}")
 
     def download_files_from_dir(self, s3_folder_path: str, local_folder: str) -> None:
         files = self.list_objects_in_dir(s3_folder_path)['Contents']
-        for content in files[1:]:
+        print(f'Available files in s3 dir {files}')
+        for content in files:
             file_name = content['Key']
             local_file_path = os.path.join(local_folder, os.path.basename(file_name))
             self.download_file(file_name, local_file_path)
@@ -116,7 +117,7 @@ class SqsClient:
 
         return False
 
-    def wait_for_event(self, event_name: str) -> EventMessage:
+    def wait_for_event(self, event_name: str, should_be_deleted=True) -> EventMessage:
         while True:
             response = self.poll_message()
             print(f"Got message: {response}")
@@ -128,7 +129,8 @@ class SqsClient:
 
             if event.event_type == event_name:
                 print(f"Received: {event_name}")
-                self.delete_message(receipt_handle)
+                if should_be_deleted:
+                    self.delete_message(receipt_handle)
                 return event
 
 
@@ -222,13 +224,13 @@ class KubernetesManager:
         self.core_v1_api.delete_namespaced_secret(name, namespace, body=client.V1DeleteOptions())
 
     def delete_ingress(self, name: str, namespace: str):
-        self.batch_v1_api.delete_namespaced_job(name, namespace, body=client.V1DeleteOptions())
+        self.networking_v1_api.delete_namespaced_ingress(name, namespace, body=client.V1DeleteOptions())
 
     def delete_service(self, name: str, namespace: str):
         self.core_v1_api.delete_namespaced_service(name, namespace, body=client.V1DeleteOptions())
 
     def delete_job(self, name: str, namespace: str):
-        self.core_v1_api.delete_namespaced_service(name, namespace, body=client.V1DeleteOptions())
+        self.batch_v1_api.delete_namespaced_job(name, namespace, body=client.V1DeleteOptions())
 
     def is_deployment_ready(self, obj: Any, manifest_data: Dict) -> bool:
         print(f'Current number of replicas: {obj.status.ready_replicas}')
@@ -245,7 +247,8 @@ class KubernetesManager:
 
     ready_conditions = {
         'Deployment': is_deployment_ready,
-        'StatefulSet': is_stateful_set_ready
+        'StatefulSet': is_stateful_set_ready,
+        'Job': is_job_finished
     }
 
     read_functions = {
