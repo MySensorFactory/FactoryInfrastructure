@@ -1,4 +1,4 @@
-from cicd_tools import ParameterStoreClient, SnsClient, DeploymentMessage, Deployment
+from pythoncommons.cicd_tools import ParameterStoreClient, SnsClient, DeploymentMessage, Deployment
 import os
 
 

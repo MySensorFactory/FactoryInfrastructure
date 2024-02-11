@@ -1,4 +1,4 @@
-from cicd_tools import EventMessage, SnsClient, ParameterStoreClient
+from pythoncommons.cicd_tools import EventMessage, SnsClient, ParameterStoreClient
 
 REGION = 'eu-central-1'
 ACCOUNT_ID = '781648067507'

@@ -1,4 +1,4 @@
-from cicd_tools import ParameterStoreClient, SqsClient
+from pythoncommons.cicd_tools import ParameterStoreClient, SqsClient
 
 REGION = 'eu-central-1'
 ACCOUNT_ID = '781648067507'
