@@ -294,6 +294,13 @@ Resources:
     Metadata:
       SamResourceId: LambdaLayer
 
+  DataProducerScheduler:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      FlexibleTimeWindow: '-'
+      ScheduleExpression: rate (1 minutes)
+      Target: !Ref DataPublisherLambdaFunction
+
   CICDSNSTopic:
     Type: AWS::SNS::Topic
     Properties:
