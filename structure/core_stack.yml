@@ -1,0 +1,798 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation Template to create master and node for Kubernetes cluster
+Transform: 'AWS::Serverless-2016-10-31'
+
+Parameters:
+  S3BucketParam:
+    Type: String
+    Default: factory-ci-cd
+    Description: Factory bucket name
+
+  ZoneIdParam:
+    Description: ID of the availability zone
+    Type: String
+    Default: eu-central-1
+
+  AccountIdParam:
+    Description: ID of the AWS account
+    Type: String
+    Default: 781648067507
+
+  S3CommonsKeyParam:
+    Type: String
+    Default: applications/lambda/commons.zip
+    Description: Commons key param
+
+  S3DataSimulatorKeyParam:
+    Type: String
+    Default: applications/lambda/data_publisher.zip
+    Description: Gas flow rate simulator key param
+
+  RegionParam:
+    Description: Region of the AWS resources
+    Type: String
+    Default: eu-central-1
+
+  NodeAmi:
+    Description: OS image, default ubuntu 20.04
+    Type: String
+    Default: ami-0ab1a82de7ca5889c
+
+  DatabaseVolumeId:
+    Description: Id of database volume
+    Type: String
+    Default: vol-0fa4439db2193b41a
+
+  NodeInstanceTypeParam:
+    Description: Node instance type
+    Type: String
+    Default: t3.medium
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t3.medium
+      - t3.micro
+
+Resources:
+  HumiditySNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: GasCompositionSNSTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+    Description: Gas composition simulator
+
+  VibrationSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: NoiseVibrationSNSTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+    Description: Noise and vibration simulator
+
+  PressureSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: PressureSNSTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+    Description: Pressure simulator
+
+  TemperatureSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: TemperatureSNSTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+    Description: Temperature simulator
+
+  PressureSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: PressureSQSQueue
+    Description: SQS queue for pressure data
+
+  TemperatureSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: TemperatureSQSQueue
+    Description: SQS queue for temperature data
+
+  HumiditySQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: FlowRateSQSQueue
+    Description: SQS queue for flow rate data
+
+  VibrationSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: NoiseVibrationSQSQueue
+    Description: SQS queue for noise and vibration data
+
+  PressureFactoryDataSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt PressureSQSQueue.Arn
+      Protocol: sqs
+      TopicArn: !Ref PressureSNSTopic
+    Description: Subscription for PressureSQSQueue to FactoryDataSNSTopic
+
+  TemperatureFactoryDataSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt TemperatureSQSQueue.Arn
+      Protocol: sqs
+      TopicArn: !Ref TemperatureSNSTopic
+    Description: Subscription for TemperatureSQSQueue to FactoryDataSNSTopic
+
+  HumidityFactoryDataSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      TopicArn: !Ref HumiditySNSTopic
+      Endpoint: !GetAtt HumiditySQSQueue.Arn
+    Description: Subscription for FlowRateSQSQueue to FlowRateSNSTopic
+
+  VibrationFactoryDataSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      TopicArn: !Ref VibrationSNSTopic
+      Endpoint: !GetAtt VibrationSQSQueue.Arn
+    Description: Subscription for NoiseVibrationSQSQueue to NoiseVibrationSNSTopic
+
+  PressureSQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref PressureSQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt PressureSQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref PressureSNSTopic
+
+  TemperatureSQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref TemperatureSQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt TemperatureSQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref TemperatureSNSTopic
+
+  HumiditySQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref HumiditySQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt HumiditySQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref HumiditySNSTopic
+
+  VibrationSQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref VibrationSQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt VibrationSQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref VibrationSNSTopic
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
+      Policies:
+        - PolicyName: FactoryBasicLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: logs:CreateLogGroup
+                Resource: !Sub arn:aws:logs:${RegionParam}:${AccountIdParam}:*
+              - Effect: Allow
+                Action: logs:CreateLogStream
+                Resource: !Sub arn:aws:logs:${RegionParam}:${AccountIdParam}:log-group:/aws/lambda/*
+              - Effect: Allow
+                Action: logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${RegionParam}:${AccountIdParam}:log-group:/aws/lambda/*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: arn:aws:s3:::factory-ci-cd/*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: arn:aws:s3:::factory-ci-cd
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: arn:aws:s3:::factory-ci-cd/*
+              - Effect: Allow
+                Action: sns:Publish
+                Resource:
+                  - !Ref HumiditySNSTopic
+                  - !Ref VibrationSNSTopic
+                  - !Ref PressureSNSTopic
+                  - !Ref TemperatureSNSTopic
+
+  DataPublisherLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: DataPublisher
+      Code:
+        S3Bucket: !Ref S3BucketParam
+        S3Key: !Ref S3DataSimulatorKeyParam
+      Handler: data_publisher.lambda_handler
+      Runtime: python3.11
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          HUMIDITY_TOPIC_ARN: !Ref HumiditySNSTopic
+          VIBRATION_TOPIC_ARN: !Ref VibrationSNSTopic
+          PRESSURE_TOPIC_ARN: !Ref PressureSNSTopic
+          TEMPERATURE_TOPIC_ARN: !Ref TemperatureSNSTopic
+          S3_BUCKET: !Ref S3BucketParam
+          S3_PREFIX: 'applications/dataset/'
+          METADATA_KEY: 'applications/dataset/historical_metadata.json'
+      Layers:
+        - !Ref PowertoolsLambdaLayer
+        - arn:aws:lambda:eu-central-1:336392948345:layer:AWSSDKPandas-Python311:20
+
+  PowertoolsLambdaLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      Description: AWS Lambda Layer for aws-lambda-powertools version 2.25.1
+      LayerName: aws-lambda-powertools-python-layer
+      ContentUri:
+        Bucket: awsserverlessrepo-changesets-1xxlnameudh3r
+        Key: 781648067507/arn:aws:serverlessrepo:eu-west-1:057560766410:applications-aws-lambda-powertools-python-layer-versions-2.25.1/2808c803-98e5-4e17-a82c-80f7db4cbe0f
+      CompatibleRuntimes:
+        - python3.11
+      LicenseInfo: Available under the Apache-2.0 license.
+      RetentionPolicy: Retain
+    Metadata:
+      SamResourceId: LambdaLayer
+
+  CICDSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: CICDSNSTopic
+      FifoTopic: true
+
+  CICDTopicArnSsmParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: "/CICD/CICDTopicArn"
+      Type: String
+      Value: !Ref CICDSNSTopic
+
+  CICDSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: CICDSQSQueue
+
+  CICDSNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt CICDSQSQueue.Arn
+      Protocol: sqs
+      TopicArn: !Ref CICDSNSTopic
+
+  CICDQueueArnSsmParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: "/CICD/CICDQueueUrl"
+      Type: String
+      Value: !Ref CICDSQSQueue
+
+  CICDQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref CICDSQSQueue
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt CICDSQSQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref CICDSNSTopic
+
+  CodeBuildPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: VisualEditor0
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:PutLogEvents
+              - logs:CreateLogStream
+              - codebuild:CreateReportGroup
+              - codebuild:CreateReport
+              - codebuild:UpdateReport
+              - codebuild:BatchPutCodeCoverages
+              - codebuild:BatchPutTestCases
+              - codeartifact:GetAuthorizationToken
+              - codeartifact:ReadFromRepository
+              - codeartifact:GetRepositoryEndpoint
+              - codeartifact:PutPackageMetadata
+              - codeartifact:PublishPackageVersion
+            Resource:
+              - !Sub arn:aws:codeartifact:${ZoneIdParam}:${AccountIdParam}:repository/factory/FactoryRepository
+              - !Sub arn:aws:codeartifact:${ZoneIdParam}:${AccountIdParam}:package/factory/FactoryRepository/*/*/*
+              - !Sub arn:aws:codeartifact:${ZoneIdParam}:${AccountIdParam}:domain/factory
+              - !Sub arn:aws:logs:${ZoneIdParam}:${AccountIdParam}:log-group:/aws/codebuild/*
+              - !Sub arn:aws:codebuild:${ZoneIdParam}:${AccountIdParam}:report-group/*
+          - Sid: VisualEditor1
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketAcl
+              - s3:PutObject
+              - s3:GetObject
+              - s3:DeleteObject
+              - s3:GetBucketLocation
+              - s3:List*
+              - s3:CreateBucket
+              - s3:GetObjectVersion
+              - sts:GetServiceBearerToken
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeDhcpOptions
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:DescribeSubnets
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeVpcs
+              - lambda:UpdateFunctionCode
+              - lambda:PublishLayerVersion
+              - states:UpdateStateMachine
+              - states:PublishStateMachineVersion
+            Resource: '*'
+          - Effect: "Allow"
+            Action:
+              - sns:Publish
+              - sns:Subscribe
+            Resource: !Sub arn:aws:sns:${ZoneIdParam}:${AccountIdParam}:*
+          - Effect: "Allow"
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:GetParametersByPath
+              - ssm:PutParameter
+            Resource: "*"
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CodeBuildPolicy
+
+  InfrastructureCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: InfrastructureCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: LAMBDAS_SOURCE_FOLDER
+            Type: PLAINTEXT
+            Value: lambda_functions
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: S3_LAMBDAS_DESTINATION
+            Type: PLAINTEXT
+            Value: applications/lambda
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: infrastructure
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/FactoryInfrastructure.git
+        GitCloneDepth: 1
+
+  DatabaseCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: DatabaseCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: database
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/database
+        GitCloneDepth: 1
+
+  KafkaCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: KafkaCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: kafka
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/kafka
+        GitCloneDepth: 1
+
+  SqsKafkaForwarderCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: SqsKafkaForwarderCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: sqs-kafka-forwarder
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/sqs-kafka-forwarder
+        GitCloneDepth: 1
+
+  FrontServiceCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: FrontServiceCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: front-service
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/front-service
+        GitCloneDepth: 1
+
+  ApiStoreCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: ApiStoreCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: api-store
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/api-store
+        GitCloneDepth: 1
+
+  KafkaDbForwarderCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: KafkaDbForwarderCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: kafka-db-forwarder
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/kafka-db-forwarder
+        GitCloneDepth: 1
+
+  EntityStoreCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: EntityStoreCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: entity-store
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/entity-store
+        GitCloneDepth: 1
+
+  DataServiceCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: DataServiceCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: data-service
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/data-service
+        GitCloneDepth: 1
+
+  FactoryParentCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: FactoryParentCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: factory-parent
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/factory-parent
+        GitCloneDepth: 1
+
+  UsersServiceCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: UsersServiceCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: users-service
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/users-service
+        GitCloneDepth: 1
+
+  KafkaDataProcessorCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: KafkaDataProcessorCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: BUCKET_NAME
+            Type: PLAINTEXT
+            Value: factory-ci-cd
+          - Name: PROJECT_NAME
+            Type: PLAINTEXT
+            Value: kafka-data-processor
+          - Name: DOCKER_USERNAME
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_USERNAME
+          - Name: DOCKER_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /FactorySecrets/DOCKER_PASSWORD
+          - Name: DOCKER_BUILD
+            Type: PLAINTEXT
+            Value: yes
+      Source:
+        Type: GITHUB
+        Location: https://github.com/MySensorFactory/kafka-data-processor
+        GitCloneDepth: 1
+
+Outputs:
+  CICDSQSQueue:
+    Description: ARN of the created CICD SQS Queue
+    Value: !Ref CICDSQSQueue
+
+  FactoryDataSNSTopic:
+    Description: ARN of the created SNS Topic
+    Value: "FlowRateSNSTopic"
+
+  PressureSQSQueueURL:
+    Description: URL of the pressure SQS Queue
+    Value: !Ref PressureSQSQueue
+
+  TemperatureSQSQueueURL:
+    Description: URL of the temperature SQS Queue
+    Value: !Ref TemperatureSQSQueue
+
+  PowertoolsLayerVersionArn:
+    Description: ARN for the published Layer version
+    Value: !Ref PowertoolsLambdaLayer
+    Export:
+      Name:
+        Fn::Sub: PowertoolsLayerVersionArn-${AWS::StackName}
